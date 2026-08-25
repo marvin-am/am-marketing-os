@@ -99,7 +99,7 @@ Whoever holds the specification should paste the missing text into this table.
 | 6 | published forms cannot be mutated | met in the product; trigger reached in code only | read-only builder + `form_versions` trigger |
 | 7 | answers survive back navigation | met, exercised in the product | funnel runtime |
 | 8 | no horizontal scroll at 320/375/430 px | met at 320 and 390 px, measured | funnel runtime + E2E |
-| 9 | validation errors are focusable and announced | partial — text inputs correct, radio/checkbox groups put `aria-describedby` on the `<fieldset>` rather than the focused control | `@am/ui` `FormFieldRow` |
+| 9 | validation errors are focusable and announced | met, exercised in the product | `@am/ui` `FormFieldRow`. The error now describes the focused control on a choice group too, and a group's caption no longer labels its first option — clicking the question used to answer it |
 | 10 | duplicate submits produce exactly one submission | met, exercised in the product | `UNIQUE (submission_attempt_id)`, replayed payload returns the same id |
 | 11 | a visitor keeps the same arm | met, exercised in the product | `@am/tracking` assignment |
 | 12 | one exposure per actual render | reached in code only — the funnel runtime has no database | `UNIQUE (experiment, visitor, session)` |
@@ -116,7 +116,7 @@ Whoever holds the specification should paste the missing text into this table.
 | 23 | Meta success only after provider confirmation | met, exercised in the product | `@am/meta` commands. The paused-draft transition runs the same confirm-plus-dry-run path as the recommendations, and a state whose name is a claim about Meta's records renders as unconfirmed until the provider says otherwise |
 | 24 | role limits block unauthorised increases | met, exercised in the product | `evaluateBudgetChange`, re-checked server-side |
 | 25 | changes invalidate approvals | met, exercised in the product | content-hash approvals |
-| 26 | audit log records generations, approvals, state changes | met, exercised in the product | `/kampagnen/<id>/versionen` |
+| 26 | audit log records generations, approvals, state changes | met, exercised in the product | `/kampagnen/<id>/versionen`. Until an end-to-end run caught it, no sink was installed at all: the page listed eight fixture rows while recording nothing. An action that cannot be logged is now refused rather than performed |
 | 27 | *text not in this repository* | ungradeable | — |
 | 28 | *text not in this repository* | ungradeable | — |
 | 29 | no form PII in analytics, URLs or logs | met, exercised in the product | `assertNoPii`, `redact`, verified against real submitted contact data |

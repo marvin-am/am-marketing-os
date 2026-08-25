@@ -388,6 +388,26 @@ describe('result states', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Überschrift');
   });
 
+  it('nests its own headings when the page around it owns the h1', () => {
+    render(
+      <ResultView
+        spec={POTENZIALANALYSE_FORM_SPEC}
+        variant={variant('ANALYSIS')}
+        targets={TARGETS}
+        answers={QUALIFIED_ANSWERS}
+        redirect={null}
+        headingLevel={2}
+      />,
+    );
+
+    /* Demoting the panel's headline must take its sections with it. A headline
+       at h2 with sections still at h2 reads as four sibling topics rather than
+       one result with parts, and the outline stops saying which is which. */
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Überschrift');
+    expect(screen.getByRole('heading', { level: 3, name: 'Ihre Einordnung' })).toBeInTheDocument();
+  });
+
   it('shows only the analysis sections whose condition matches', () => {
     render(
       <ResultView

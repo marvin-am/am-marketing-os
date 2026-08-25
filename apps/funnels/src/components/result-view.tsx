@@ -12,6 +12,7 @@ import {
 } from '@am/funnel-schema';
 import type { ResolvedRedirect, ResolvedTarget } from '@/server/redirect';
 import type { FormTargets } from '@/server/spec-targets';
+import { headingTag, type HeadingLevel } from '@/lib/heading-level';
 
 /**
  * The terminal states.
@@ -38,6 +39,12 @@ export interface ResultViewProps {
   answers: Answers;
   /** Present only once a submission was accepted. */
   redirect: ResolvedRedirect | null;
+  /**
+   * Level of the result headline. `1` when the form is the whole document; `2`
+   * when a page around it already carries the `h1`. The panel replaces the form
+   * in place, so it inherits whatever level the form was rendered with.
+   */
+  headingLevel?: HeadingLevel;
   onBookingStart?: () => void;
 }
 
@@ -52,11 +59,12 @@ function Panel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Headline({ children }: { children: React.ReactNode }) {
+function Headline({ level, children }: { level: HeadingLevel; children: React.ReactNode }) {
+  const Tag = headingTag(level);
   return (
-    <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground">
+    <Tag className="break-words text-2xl font-semibold tracking-tight text-foreground">
       {children}
-    </h1>
+    </Tag>
   );
 }
 
@@ -186,14 +194,18 @@ export function ResultView({
   targets,
   answers,
   redirect,
+  headingLevel = 1,
   onBookingStart,
 }: ResultViewProps) {
   const variantTargets = variant ? targets.variants[variant.variantId] : undefined;
+  /* An analysis section is a subsection of the result, so it follows the
+     headline down rather than sitting beside it. */
+  const SectionHeading = headingTag(headingLevel, 1);
 
   if (!variant) {
     return (
       <Panel>
-        <Headline>{spec.success.headline}</Headline>
+        <Headline level={headingLevel}>{spec.success.headline}</Headline>
         <Body>{spec.success.body}</Body>
         <Bullets items={spec.success.bullets} />
         {redirect ? <RedirectNotice redirect={redirect} /> : null}
@@ -203,7 +215,7 @@ export function ResultView({
 
   const shared = (
     <>
-      <Headline>{variant.headline}</Headline>
+      <Headline level={headingLevel}>{variant.headline}</Headline>
       <Body>{variant.body}</Body>
     </>
   );
@@ -256,9 +268,9 @@ export function ResultView({
               .filter((section) => matchesOptional(section.showWhen, answers))
               .map((section) => (
                 <div key={section.key} className="grid min-w-0 gap-1">
-                  <h2 className="break-words text-lg font-semibold text-foreground">
+                  <SectionHeading className="break-words text-lg font-semibold text-foreground">
                     {section.title}
-                  </h2>
+                  </SectionHeading>
                   <p className="break-words text-base leading-relaxed text-foreground">
                     {section.body}
                   </p>

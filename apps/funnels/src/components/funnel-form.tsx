@@ -22,6 +22,7 @@ import { StepProgress } from './progress';
 import { ResultView } from './result-view';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/answers-storage';
 import { fieldDomId } from '@/lib/dom-ids';
+import { headingTag, type HeadingLevel } from '@/lib/heading-level';
 import { firePixelLead } from '@/lib/pixel';
 import { randomId } from '@/lib/random-id';
 import { useTracker } from '@/lib/use-tracker';
@@ -62,6 +63,11 @@ export interface FunnelFormProps {
   collectEndpoint: string;
   /** Skip the intro screen — the hybrid page has already made the offer. */
   skipIntro?: boolean;
+  /**
+   * Level of the form's own headings. `1` when the form is the whole document;
+   * `2` when a page around it already carries the `h1`.
+   */
+  headingLevel?: HeadingLevel;
   /** Emit `funnel_viewed` from here; the page has no other client component. */
   emitEntryEvents?: boolean;
 }
@@ -126,9 +132,11 @@ export function FunnelForm({
   submitEndpoint,
   collectEndpoint,
   skipIntro = false,
+  headingLevel = 1,
   emitEntryEvents = true,
 }: FunnelFormProps) {
   const firstStepId = entryStepId(spec) ?? '';
+  const Heading = headingTag(headingLevel);
 
   const [phase, setPhase] = useState<Phase>(skipIntro ? 'STEP' : 'INTRO');
   const [answers, setAnswers] = useState<Answers>({});
@@ -217,9 +225,14 @@ export function FunnelForm({
   useEffect(() => {
     if (!focusRequest) return;
     const container = globalThis.document?.querySelector(`[data-field="${focusRequest.fieldId}"]`);
+    /* Focus has to land on something focusable. `fieldDomId` names a choice
+       field's `<fieldset>`, which is not, so the fallback descends into the
+       group rather than trying to focus the box around it. */
+    const byId = globalThis.document?.getElementById(fieldDomId(focusRequest.fieldId)) ?? null;
     const control =
       container?.querySelector<HTMLElement>('input, select, textarea') ??
-      (globalThis.document?.getElementById(fieldDomId(focusRequest.fieldId)) as HTMLElement | null);
+      byId?.querySelector<HTMLElement>('input, select, textarea') ??
+      byId;
     control?.focus();
   }, [focusRequest]);
 
@@ -387,6 +400,7 @@ export function FunnelForm({
           targets={targets}
           answers={answers}
           redirect={result?.redirect ?? null}
+          headingLevel={headingLevel}
           onBookingStart={() => tracker.bookingStarted()}
         />
       </div>
@@ -402,9 +416,9 @@ export function FunnelForm({
             {spec.intro.eyebrow}
           </p>
         ) : null}
-        <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground">
+        <Heading className="break-words text-2xl font-semibold tracking-tight text-foreground">
           {spec.intro.headline}
-        </h1>
+        </Heading>
         {spec.intro.subline ? (
           <p className="break-words text-base leading-relaxed text-muted-foreground">
             {spec.intro.subline}
@@ -449,13 +463,16 @@ export function FunnelForm({
       ) : null}
 
       <div className="grid min-w-0 gap-2">
-        <h1
+        {/* `tabIndex={-1}` and the ref stay whatever the level is: the step
+            heading is the target focus moves to when the question changes, which
+            is the only announcement a screen-reader user gets for it. */}
+        <Heading
           ref={stepHeadingRef}
           tabIndex={-1}
           className="break-words text-xl font-semibold tracking-tight text-foreground outline-hidden"
         >
           {step.title}
-        </h1>
+        </Heading>
         {step.subtitle ? (
           <p className="break-words text-base text-muted-foreground">{step.subtitle}</p>
         ) : null}

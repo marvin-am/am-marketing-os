@@ -6,7 +6,7 @@ import type { TrackerContext } from '@am/tracking/beacon';
 import { FunnelForm } from './funnel-form';
 import { FormFieldControl } from './form-field';
 import { resolveFormTargets } from '@/server/spec-targets';
-import { fieldDomId } from '@/lib/dom-ids';
+import { fieldErrorDomId } from '@/lib/dom-ids';
 
 /**
  * The mobile behaviours that decide whether a lead exists at all.
@@ -108,10 +108,18 @@ describe('validation feedback', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Bitte füllen Sie dieses Feld aus.');
+    expect(alert).toHaveAttribute('id', fieldErrorDomId('rolle'));
 
-    const firstControl = document.getElementById(fieldDomId('rolle'));
-    expect(firstControl).not.toBeNull();
-    expect(document.activeElement).toBe(firstControl);
+    /* Focus lands on a control — the group's first radio, not the `<fieldset>`
+       around it, which cannot take focus. */
+    const focused = document.activeElement as HTMLElement | null;
+    expect(focused).toBe(screen.getAllByRole('radio')[0]);
+    expect(focused?.closest('[data-field]')?.getAttribute('data-field')).toBe('rolle');
+
+    /* And that control carries the message. An `aria-describedby` on the
+       fieldset would leave the visitor sitting on a focused, invalid radio with
+       nothing said about why the step refused to advance. */
+    expect(focused).toHaveAccessibleDescription(/Bitte füllen Sie dieses Feld aus\./);
   });
 
   it('clears the error as soon as the visitor answers', async () => {

@@ -23,8 +23,10 @@ import type { ResolvedTarget } from '@/server/redirect';
  *
  * The non-negotiables, in markup terms:
  *
- * - every control has a real `<label for>`, an `aria-describedby` that carries
- *   help text and error, and `aria-invalid` when it is wrong;
+ * - every control is named — a `<label for>` for a single control, a
+ *   `<fieldset>` and `<legend>` for a group of them — and carries an
+ *   `aria-describedby` with help text and error plus `aria-invalid` when it is
+ *   wrong;
  * - every hit target is at least 44 × 44 px (`min-h-11`, and the label is the
  *   target, not just the 20 px radio dot);
  * - controls are 16 px on small screens, because iOS zooms anything smaller on
@@ -90,6 +92,87 @@ function asList(value: AnswerValue): string[] {
   return [String(value)];
 }
 
+interface ChoiceOptionView {
+  /** The value written to the answer, and the suffix of the option's DOM id. */
+  key: string;
+  label: string;
+  helpText: string | null;
+}
+
+interface ChoiceGroupProps {
+  fieldId: string;
+  /** The question. Names the group, and nothing else. */
+  legend: string;
+  type: 'radio' | 'checkbox';
+  options: readonly ChoiceOptionView[];
+  isSelected: (key: string) => boolean;
+  onToggle: (key: string, checked: boolean) => void;
+  onBlur: () => void;
+  describedBy: string | undefined;
+  invalid: boolean;
+}
+
+/**
+ * Radio and checkbox groups — the one control on this form built out of several
+ * inputs, and therefore the one where a name can land on the wrong element.
+ *
+ * The question names the *group*, through the `<legend>`. It must never reach a
+ * single option: an option that borrows the field id from the caption above
+ * announces as "<question> <option>" while its siblings announce as "<option>",
+ * and a tap on the question — which reads as inert text — silently selects that
+ * option and sends it along with the lead.
+ */
+function ChoiceGroup({
+  fieldId,
+  legend,
+  type,
+  options,
+  isSelected,
+  onToggle,
+  onBlur,
+  describedBy,
+  invalid,
+}: ChoiceGroupProps) {
+  return (
+    /* The caption above points its `for` at this id. A `<fieldset>` is not a
+       labelable element, so the reference names the group for a reader without
+       ever turning the question into a control's label. */
+    <fieldset id={fieldDomId(fieldId)} className="min-w-0 border-0 p-0">
+      <legend className="sr-only">{legend}</legend>
+      <div className="grid gap-2">
+        {options.map((option) => (
+          <label key={option.key} className={CHOICE_CLASS}>
+            <input
+              type={type}
+              id={optionDomId(fieldId, option.key)}
+              name={fieldId}
+              className={DOT_CLASS}
+              value={option.key}
+              checked={isSelected(option.key)}
+              /* Help text and error hang off the inputs rather than off the
+                 fieldset: a failed step moves focus to a control, and a
+                 description the focused control does not carry is one no screen
+                 reader announces. */
+              aria-describedby={describedBy}
+              aria-invalid={invalid || undefined}
+              onChange={(event) => onToggle(option.key, event.target.checked)}
+              onBlur={onBlur}
+            />
+            <span className="min-w-0">
+              <span className="block break-words text-base font-medium">{option.label}</span>
+              {option.helpText ? (
+                <span className="block break-words text-sm text-muted-foreground">
+                  {option.helpText}
+                </span>
+              ) : null}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function FormFieldControl({
   spec,
   field,
@@ -109,6 +192,8 @@ export function FormFieldControl({
     onBlur: () => onBlur(field.fieldId),
   } as const;
 
+  /* `fieldDomId` identifies the field's control: the input, the select, or —
+     for a choice field — the `<fieldset>` around its options. */
   const labelNode =
     field.type === 'CONSENT' ? null : (
       <label
@@ -149,34 +234,21 @@ export function FormFieldControl({
         break;
       }
       control = (
-        <fieldset className="min-w-0 border-0 p-0" aria-describedby={described}>
-          <legend className="sr-only">{field.label}</legend>
-          <div className="grid gap-2">
-            {field.options.map((option, index) => (
-              <label key={option.optionId} className={CHOICE_CLASS}>
-                <input
-                  type="radio"
-                  id={index === 0 ? fieldDomId(field.fieldId) : optionDomId(field.fieldId, option.optionId)}
-                  name={field.fieldId}
-                  className={DOT_CLASS}
-                  value={option.optionId}
-                  checked={selected === option.optionId}
-                  aria-invalid={invalid || undefined}
-                  onChange={() => onChange(field.fieldId, option.optionId)}
-                  onBlur={() => onBlur(field.fieldId)}
-                />
-                <span className="min-w-0">
-                  <span className="block break-words text-base font-medium">{option.label}</span>
-                  {option.helpText ? (
-                    <span className="block break-words text-sm text-muted-foreground">
-                      {option.helpText}
-                    </span>
-                  ) : null}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <ChoiceGroup
+          fieldId={field.fieldId}
+          legend={field.label}
+          type="radio"
+          options={field.options.map((option) => ({
+            key: option.optionId,
+            label: option.label,
+            helpText: option.helpText ?? null,
+          }))}
+          isSelected={(key) => selected === key}
+          onToggle={(key) => onChange(field.fieldId, key)}
+          onBlur={() => onBlur(field.fieldId)}
+          describedBy={described}
+          invalid={invalid}
+        />
       );
       break;
     }
@@ -184,73 +256,47 @@ export function FormFieldControl({
     case 'MULTI_SELECT': {
       const selected = asList(value);
       control = (
-        <fieldset className="min-w-0 border-0 p-0" aria-describedby={described}>
-          <legend className="sr-only">{field.label}</legend>
-          <div className="grid gap-2">
-            {field.options.map((option, index) => (
-              <label key={option.optionId} className={CHOICE_CLASS}>
-                <input
-                  type="checkbox"
-                  id={index === 0 ? fieldDomId(field.fieldId) : optionDomId(field.fieldId, option.optionId)}
-                  name={field.fieldId}
-                  className={DOT_CLASS}
-                  value={option.optionId}
-                  checked={selected.includes(option.optionId)}
-                  aria-invalid={invalid || undefined}
-                  onChange={(event) =>
-                    onChange(
-                      field.fieldId,
-                      event.target.checked
-                        ? [...selected, option.optionId]
-                        : selected.filter((entry) => entry !== option.optionId),
-                    )
-                  }
-                  onBlur={() => onBlur(field.fieldId)}
-                />
-                <span className="min-w-0">
-                  <span className="block break-words text-base font-medium">{option.label}</span>
-                  {option.helpText ? (
-                    <span className="block break-words text-sm text-muted-foreground">
-                      {option.helpText}
-                    </span>
-                  ) : null}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <ChoiceGroup
+          fieldId={field.fieldId}
+          legend={field.label}
+          type="checkbox"
+          options={field.options.map((option) => ({
+            key: option.optionId,
+            label: option.label,
+            helpText: option.helpText ?? null,
+          }))}
+          isSelected={(key) => selected.includes(key)}
+          onToggle={(key, checked) =>
+            onChange(
+              field.fieldId,
+              checked ? [...selected, key] : selected.filter((entry) => entry !== key),
+            )
+          }
+          onBlur={() => onBlur(field.fieldId)}
+          describedBy={described}
+          invalid={invalid}
+        />
       );
       break;
     }
 
     case 'BOOLEAN': {
       const selected = asString(value);
-      const choices = [
-        { key: 'true', label: field.trueLabel },
-        { key: 'false', label: field.falseLabel },
-      ];
       control = (
-        <fieldset className="min-w-0 border-0 p-0" aria-describedby={described}>
-          <legend className="sr-only">{field.label}</legend>
-          <div className="grid gap-2">
-            {choices.map((choice, index) => (
-              <label key={choice.key} className={CHOICE_CLASS}>
-                <input
-                  type="radio"
-                  id={index === 0 ? fieldDomId(field.fieldId) : optionDomId(field.fieldId, choice.key)}
-                  name={field.fieldId}
-                  className={DOT_CLASS}
-                  value={choice.key}
-                  checked={selected === choice.key}
-                  aria-invalid={invalid || undefined}
-                  onChange={() => onChange(field.fieldId, choice.key === 'true')}
-                  onBlur={() => onBlur(field.fieldId)}
-                />
-                <span className="min-w-0 break-words text-base font-medium">{choice.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <ChoiceGroup
+          fieldId={field.fieldId}
+          legend={field.label}
+          type="radio"
+          options={[
+            { key: 'true', label: field.trueLabel, helpText: null },
+            { key: 'false', label: field.falseLabel, helpText: null },
+          ]}
+          isSelected={(key) => selected === key}
+          onToggle={(key) => onChange(field.fieldId, key === 'true')}
+          onBlur={() => onBlur(field.fieldId)}
+          describedBy={described}
+          invalid={invalid}
+        />
       );
       break;
     }

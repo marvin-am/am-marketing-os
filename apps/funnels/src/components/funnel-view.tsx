@@ -50,6 +50,17 @@ export function FunnelView({
   const spec = version.spec;
   const hasForm = formSpec !== null && formInstanceId !== null;
 
+  /**
+   * Whether the form *is* the document.
+   *
+   * On a landing or hybrid funnel it is not: the page's hero already made the
+   * offer and already owns the `h1`, so the form skips its intro screen and its
+   * headings nest one level below. Two first-level headings on one page leave
+   * the document with no single answer to "what is this page about", and the
+   * step heading changes on every answer, so it is the wrong candidate.
+   */
+  const standalone = spec.kind === 'MULTI_STEP_FORM';
+
   /* Built once and placed by kind. The entry events (`funnel_viewed`, and the
      single `experiment_exposed`) ride on whichever client component the page
      actually ships, so exactly one of them emits them. */
@@ -63,7 +74,8 @@ export function FunnelView({
       experiment={experiment}
       submitEndpoint={SUBMIT_ENDPOINT}
       collectEndpoint={COLLECT_ENDPOINT}
-      skipIntro={spec.kind !== 'MULTI_STEP_FORM'}
+      skipIntro={!standalone}
+      headingLevel={standalone ? 1 : 2}
     />
   ) : null;
 
@@ -75,7 +87,7 @@ export function FunnelView({
     />
   );
 
-  if (spec.kind === 'MULTI_STEP_FORM') {
+  if (standalone) {
     /* The funnel document *is* the form document. Rendering the version's own
        spec rather than a separately loaded one keeps the arm the visitor was
        assigned and the form they fill in from ever drifting apart. */
