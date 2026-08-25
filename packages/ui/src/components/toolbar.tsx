@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Toolbar as ToolbarPrimitive } from 'radix-ui';
 import { cn } from '../lib/cn';
-import { buttonVariants } from './button';
+import { buttonVariants } from './button.variants';
 
 export interface ToolbarProps
   extends React.ComponentPropsWithoutRef<typeof ToolbarPrimitive.Root> {

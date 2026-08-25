@@ -1,29 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { type VariantProps } from 'class-variance-authority';
 import { AlertTriangle, CheckCircle2, Info, OctagonAlert } from 'lucide-react';
 import { cn } from '../lib/cn';
-
-export const alertVariants = cva(
-  cn(
-    'relative grid w-full grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1',
-    'rounded-lg border px-4 py-3.5 text-sm',
-    '[&>svg]:mt-0.5 [&>svg]:size-4.5 [&>svg]:shrink-0',
-  ),
-  {
-    variants: {
-      tone: {
-        info: 'border-info-border bg-info-surface text-info',
-        success: 'border-success-border bg-success-surface text-success',
-        warning: 'border-warning-border bg-warning-surface text-warning',
-        destructive: 'border-destructive-border bg-destructive-surface text-destructive',
-        neutral: 'border-border bg-surface-raised text-foreground',
-      },
-    },
-    defaultVariants: { tone: 'neutral' },
-  },
-);
+import { alertVariants } from './alert.variants';
 
 export type AlertTone = NonNullable<VariantProps<typeof alertVariants>['tone']>;
 

@@ -1,31 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/cn';
-
-export const cardVariants = cva(
-  'rounded-lg border border-border bg-surface text-foreground',
-  {
-    variants: {
-      elevation: {
-        flat: '',
-        raised: 'shadow-sm',
-        floating: 'shadow-md',
-      },
-      tone: {
-        default: '',
-        muted: 'bg-surface-raised',
-        destructive: 'border-destructive-border bg-destructive-surface',
-        warning: 'border-warning-border bg-warning-surface',
-      },
-    },
-    defaultVariants: {
-      elevation: 'flat',
-      tone: 'default',
-    },
-  },
-);
+import { cardVariants } from './card.variants';
 
 export interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,

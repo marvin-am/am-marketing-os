@@ -2,22 +2,9 @@
 
 import * as React from 'react';
 import { Avatar as AvatarPrimitive } from 'radix-ui';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/cn';
-
-export const avatarVariants = cva(
-  'relative flex shrink-0 overflow-hidden rounded-full border border-border bg-muted',
-  {
-    variants: {
-      size: {
-        sm: 'size-7 text-[0.625rem]',
-        md: 'size-9 text-xs',
-        lg: 'size-11 text-sm',
-      },
-    },
-    defaultVariants: { size: 'md' },
-  },
-);
+import { avatarVariants } from './avatar.variants';
 
 export interface AvatarProps
   extends React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>,

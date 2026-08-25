@@ -110,3 +110,17 @@ export * from './components/sidebar-nav';
 export * from './components/states';
 export * from './components/status-badge';
 export * from './components/toolbar';
+
+/*
+ * Style variants live in their own modules with no 'use client', so a server
+ * component can reuse the classes on a native element. Exporting them from the
+ * component module would make them client references and crash at render.
+ */
+export * from './components/alert.variants';
+export * from './components/avatar.variants';
+export * from './components/badge.variants';
+export * from './components/button.variants';
+export * from './components/card.variants';
+export * from './components/input.variants';
+export * from './components/sheet.variants';
+export * from './components/toggle.variants';
