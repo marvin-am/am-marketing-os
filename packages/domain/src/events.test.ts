@@ -94,6 +94,32 @@ describe('PII guard', () => {
     expect(() => assertNoPii({ email: 'a@b.de' })).toThrow(/personenbezogene Daten/);
   });
 
+  it('does not mistake a UUID for a phone number', () => {
+    // `00123456-7890-…` trips a naive phone heuristic. A guard that rejects
+    // valid events is a guard that gets switched off.
+    expect(
+      findPiiViolations({
+        ...baseEvent,
+        visitor_id: '00123456-7890-4abc-8def-000111222333',
+        campaign_id: '00998877-6655-4444-8333-222111000999',
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not flag ISO timestamps', () => {
+    expect(findPiiViolations({ occurred_at: '2026-03-01T10:00:00.000Z' })).toEqual([]);
+  });
+
+  it('still flags a real German number written with separators', () => {
+    expect(findPiiViolations({ metadata: { v: '0049 (0) 170 123-4567' } }).length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it('does not flag a short numeric code', () => {
+    expect(findPiiViolations({ metadata: { v: '+49 12' } })).toEqual([]);
+  });
+
   it('does not flag ordinary marketing parameters', () => {
     expect(
       findPiiViolations({

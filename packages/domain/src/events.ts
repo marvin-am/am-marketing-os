@@ -213,7 +213,24 @@ export const FORBIDDEN_EVENT_KEYS: readonly string[] = [
 ];
 
 const EMAIL_LIKE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
-const PHONE_LIKE = /(?:\+|00)\d[\d\s\-()]{7,}/;
+const PHONE_LIKE = /(?:\+|\b00)\d[\d\s\-()/.]{6,}\d/;
+
+/**
+ * Identifier shapes that are legitimately present in every event and must not
+ * be mistaken for contact data. A UUID such as `00123456-7890-4abc-…` otherwise
+ * trips the phone heuristic, which would make the guard reject valid events —
+ * and a guard that fires on good input gets switched off.
+ */
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_TIMESTAMP_LIKE = /^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** A phone number has enough digits to be one. Ids and dates do not qualify. */
+function looksLikePhoneNumber(value: string): boolean {
+  const match = PHONE_LIKE.exec(value);
+  if (!match) return false;
+  const digits = match[0].replace(/\D/g, '');
+  return digits.length >= 8 && digits.length <= 16;
+}
 
 /**
  * Structural PII scan over an arbitrary payload. Returns the JSON paths that
@@ -227,8 +244,10 @@ export function findPiiViolations(payload: unknown, path = '$'): string[] {
     if (value === null || value === undefined) return;
 
     if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (UUID_LIKE.test(trimmed) || ISO_TIMESTAMP_LIKE.test(trimmed)) return;
       if (EMAIL_LIKE.test(value)) violations.push(`${currentPath} (E-Mail-Muster)`);
-      else if (PHONE_LIKE.test(value)) violations.push(`${currentPath} (Telefonnummer-Muster)`);
+      else if (looksLikePhoneNumber(value)) violations.push(`${currentPath} (Telefonnummer-Muster)`);
       return;
     }
 
