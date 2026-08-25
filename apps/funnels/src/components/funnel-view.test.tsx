@@ -109,16 +109,34 @@ describe('one page, one h1', () => {
     expect(headings.map((heading) => heading.textContent)).toHaveLength(1);
   });
 
-  it('keeps the step heading focusable so a new step is announced', () => {
+  it('announces a new step by moving focus to its heading', async () => {
+    /*
+     * A step change replaces the whole content of the page without a
+     * navigation, so a screen reader goes on reading the old step unless focus
+     * is moved. The heading carried `tabIndex={-1}` and a ref for exactly this
+     * and nothing ever called `.focus()` — scaffolding for an announcement that
+     * never happened.
+     */
+    const user = userEvent.setup();
     renderFunnel('HYBRID', HYBRID_FUNNEL_SPEC, true);
 
-    /* Demoting the heading must not cost the step its focus target: the runtime
-       moves focus here on a step change, which is the only thing that tells a
-       screen-reader user the question changed. */
-    const stepHeading = screen.getByRole('heading', {
+    const firstHeading = screen.getByRole('heading', {
       name: POTENZIALANALYSE_FORM_SPEC.steps[0]!.title,
     });
-    expect(stepHeading.tabIndex).toBe(-1);
+    expect(firstHeading.tabIndex).toBe(-1);
+
+    /* Not on mount: the same runtime sits below a landing page's hero, where
+       focusing on load would scroll the visitor past the copy meant to convince
+       them. Nothing has changed yet, so there is nothing to announce. */
+    expect(firstHeading).not.toHaveFocus();
+
+    await user.click(screen.getByRole('radio', { name: 'Andere Rolle' }));
+    await user.click(screen.getByRole('button', { name: 'Weiter' }));
+
+    const secondHeading = await screen.findByRole('heading', {
+      name: POTENZIALANALYSE_FORM_SPEC.steps[1]!.title,
+    });
+    expect(secondHeading).toHaveFocus();
   });
 
   it('still has one h1 once the hybrid form reaches a terminal state', async () => {

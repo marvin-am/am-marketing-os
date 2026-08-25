@@ -28,21 +28,36 @@ test.describe('Audit-Log', () => {
       'campaign.state_changed',
       'recommendation.generated',
     ];
+    /*
+     * Presence, not an exact count. The trail is now real, so any other spec
+     * that performs an action on this campaign legitimately adds a row — a
+     * recommendation's dry run records another `meta.command_requested`. An
+     * exact count made this spec pass only because it sorts first
+     * alphabetically under a single worker, which is not a property anyone
+     * should have to preserve.
+     */
     for (const action of expected) {
       await expect(
-        operator.locator(`[data-audit-action="${action}"]`),
+        operator.locator(`[data-audit-action="${action}"]`).first(),
         `Im Audit-Log fehlt „${action}".`,
-      ).toHaveCount(1);
+      ).toBeVisible();
     }
 
+    /* A campaign is created once, whatever else happens to it afterwards. */
+    await expect(operator.locator('[data-audit-action="campaign.created"]')).toHaveCount(1);
+
     /* The Meta command is recorded as what it was: a *paused* draft. */
-    const metaCommand = operator.locator('[data-audit-action="meta.command_requested"]');
+    /* `.first()` for the same reason: another spec's dry run may have added a
+       second row, and strict mode refuses a locator that matches more than one. */
+    const metaCommand = operator
+      .locator('[data-audit-action="meta.command_requested"]')
+      .first();
     await expect(metaCommand).toContainText('Pausierter Meta-Entwurf angefordert.');
     await expect(metaCommand).toContainText('CREATE_DRAFT_CAMPAIGN');
     await expect(metaCommand).toContainText('PAUSED');
 
     /* Each entry names an actor, a time and a correlation id. */
-    const created = operator.locator('[data-audit-action="campaign.created"]');
+    const created = operator.locator('[data-audit-action="campaign.created"]').first();
     await expect(created).toContainText('Korrelation:');
     await expect(created).toContainText(/\d{2}\.\d{2}\.\d{4}/);
 

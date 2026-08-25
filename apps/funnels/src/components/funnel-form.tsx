@@ -154,6 +154,8 @@ export function FunnelForm({
   const entryEventsSentRef = useRef(false);
   const restoredRef = useRef(false);
   const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  /* Null until the visitor has actually moved. See the focus effect below. */
+  const announcedStepRef = useRef<string | null>(null);
   const honeypotRef = useRef('');
   const [honeypot, setHoneypot] = useState('');
 
@@ -235,6 +237,27 @@ export function FunnelForm({
       byId;
     control?.focus();
   }, [focusRequest]);
+
+  /*
+   * Moving to another step replaces the whole content of the page without a
+   * navigation, so a screen reader is left reading the old step unless focus is
+   * moved deliberately. The heading carries `tabIndex={-1}` for exactly this.
+   *
+   * Deliberately not on mount. The same runtime is embedded below a landing
+   * page's hero, where focusing on load would scroll the visitor past the copy
+   * that is meant to convince them before they ever see the form. So the first
+   * step is skipped and only a real transition announces itself — which is also
+   * the only moment at which anything changed.
+   */
+  useEffect(() => {
+    if (announcedStepRef.current === null) {
+      announcedStepRef.current = stepId;
+      return;
+    }
+    if (announcedStepRef.current === stepId) return;
+    announcedStepRef.current = stepId;
+    stepHeadingRef.current?.focus({ preventScroll: false });
+  }, [stepId]);
 
   const step = getStep(spec, stepId);
   const fields = useMemo(

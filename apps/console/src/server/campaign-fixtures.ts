@@ -823,8 +823,8 @@ function buildAudit(id: string, spec: CampaignSpec): AuditLog[] {
 
 /**
  * One list, newest first, out of the seeded chain and the rows the audit store
- * holds. Deduplicated by id so a store that already contains the seeded history
- * — which a Postgres deployment will — does not render every entry twice.
+ * holds. Deduplicated by id, so that once the port reads its own history from
+ * that same store a row arriving from both sides is still rendered once.
  */
 export function mergeAuditLog(
   seeded: readonly AuditLog[],
