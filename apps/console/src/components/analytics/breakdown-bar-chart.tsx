@@ -1,7 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@am/ui';
 import { formatCurrencyMinor, formatNumber } from '@/lib/format';
 import type { BreakdownRow } from '@/server/analytics-port';
@@ -158,7 +167,10 @@ export function BreakdownBarChart({
             tickFormatter={(value: number) => formatAxisValue(value, 'MONEY')}
           />
           <YAxis type="category" dataKey="labelDe" {...AXIS_PROPS} width={220} axisLine={false} />
-          <Tooltip cursor={{ fill: 'var(--viz-grid)', fillOpacity: 0.5 }} content={<VizTooltip rowsFor={rowsFor} />} />
+          <Tooltip
+            cursor={{ fill: 'var(--viz-grid)', fillOpacity: 0.5 }}
+            content={<VizTooltip rowsFor={rowsFor} />}
+          />
           <Bar
             dataKey="spendMinor"
             name="Spend"

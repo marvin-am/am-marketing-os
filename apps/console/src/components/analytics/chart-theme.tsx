@@ -47,9 +47,17 @@ export const VIZ_STYLES = `
 }
 `;
 
-/** Injected once per chart frame. Duplicate identical rules are harmless. */
+/**
+ * Declared by every chart frame. React hoists and de-duplicates by `href`, so a
+ * page with eight charts still ships one stylesheet — and a chart rendered on
+ * its own (a test, a detail view) still gets its tokens.
+ */
 export function VizStyles(): React.JSX.Element {
-  return <style>{VIZ_STYLES}</style>;
+  return (
+    <style href="am-viz-palette" precedence="default">
+      {VIZ_STYLES}
+    </style>
+  );
 }
 
 export const VIZ_SERIES = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)'] as const;
@@ -213,7 +221,11 @@ export interface VizLegendItem {
  * A legend is always present from two series upwards. A single-series chart gets
  * none — its heading already names what is plotted.
  */
-export function VizLegend({ items }: { items: readonly VizLegendItem[] }): React.JSX.Element | null {
+export function VizLegend({
+  items,
+}: {
+  items: readonly VizLegendItem[];
+}): React.JSX.Element | null {
   if (items.length < 2) return null;
   return (
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-xs text-muted-foreground">

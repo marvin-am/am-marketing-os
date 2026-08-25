@@ -32,8 +32,8 @@ export default async function LearningsPage(): Promise<React.JSX.Element> {
         description={
           <>
             <span data-am-numeric="">{formatNumber(cards.length)}</span> Karten:{' '}
-            <span data-am-numeric="">{formatNumber(counts.FACT)}</span>{' '}
-            {CONFIDENCE_LABELS_DE.FACT}, <span data-am-numeric="">{formatNumber(counts.INDICATION)}</span>{' '}
+            <span data-am-numeric="">{formatNumber(counts.FACT)}</span> {CONFIDENCE_LABELS_DE.FACT},{' '}
+            <span data-am-numeric="">{formatNumber(counts.INDICATION)}</span>{' '}
             {CONFIDENCE_LABELS_DE.INDICATION} und{' '}
             <span data-am-numeric="">{formatNumber(counts.HYPOTHESIS)}</span>{' '}
             {CONFIDENCE_LABELS_DE.HYPOTHESIS}. Die Belegstärke wird aus Datenreife,

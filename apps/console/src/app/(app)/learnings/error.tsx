@@ -22,7 +22,10 @@ export default function LearningsError({
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Learnings" description="Die Learning-Karten konnten nicht geladen werden." />
+      <PageHeader
+        title="Learnings"
+        description="Die Learning-Karten konnten nicht geladen werden."
+      />
       <ErrorState
         title="Die Learnings konnten nicht geladen werden."
         description="Die Learning-Karten waren nicht lesbar. Bitte versuchen Sie es erneut."

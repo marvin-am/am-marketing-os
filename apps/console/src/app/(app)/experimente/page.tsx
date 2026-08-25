@@ -32,8 +32,8 @@ export default async function ExperimentsPage(): Promise<React.JSX.Element> {
         title="Experimente"
         description={
           <>
-            <span data-am-numeric="">{formatNumber(experiments.length)}</span> Tests,
-            davon <span data-am-numeric="">{formatNumber(running)}</span> laufend und{' '}
+            <span data-am-numeric="">{formatNumber(experiments.length)}</span> Tests, davon{' '}
+            <span data-am-numeric="">{formatNumber(running)}</span> laufend und{' '}
             <span data-am-numeric="">{formatNumber(concluded)}</span> abgeschlossen.{' '}
             <span data-am-numeric="">{formatNumber(withWarnings)}</span> tragen Hinweise, die die
             Interpretierbarkeit ihres Ergebnisses einschränken.

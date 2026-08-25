@@ -52,7 +52,11 @@ export function CredibleIntervalBar({
       <span
         aria-hidden="true"
         className="absolute inset-y-0 rounded-full"
-        style={{ left: `${left}%`, width: `${Math.max(2, right - left)}%`, backgroundColor: colorVar }}
+        style={{
+          left: `${left}%`,
+          width: `${Math.max(2, right - left)}%`,
+          backgroundColor: colorVar,
+        }}
       />
       <span
         aria-hidden="true"
@@ -130,15 +134,23 @@ export function ExperimentArmsTable({
   leadingArmId,
   winningArmId,
 }: ExperimentArmsTableProps): React.JSX.Element {
-  const observationById = new Map(observations.map((observation) => [observation.arm_id, observation]));
+  const observationById = new Map(
+    observations.map((observation) => [observation.arm_id, observation]),
+  );
 
   const bounds = arms.reduce<[number, number]>(
-    (acc, arm) => [Math.min(acc[0], arm.credibleInterval[0]), Math.max(acc[1], arm.credibleInterval[1])],
+    (acc, arm) => [
+      Math.min(acc[0], arm.credibleInterval[0]),
+      Math.max(acc[1], arm.credibleInterval[1]),
+    ],
     [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
   );
   const domain: [number, number] =
     Number.isFinite(bounds[0]) && Number.isFinite(bounds[1]) && bounds[1] > bounds[0]
-      ? [Math.max(0, bounds[0] - (bounds[1] - bounds[0]) * 0.1), bounds[1] + (bounds[1] - bounds[0]) * 0.1]
+      ? [
+          Math.max(0, bounds[0] - (bounds[1] - bounds[0]) * 0.1),
+          bounds[1] + (bounds[1] - bounds[0]) * 0.1,
+        ]
       : [0, 1];
 
   return (
@@ -246,7 +258,8 @@ export function ExperimentArmsTable({
                       labelDe={arm.label}
                     />
                     <span data-am-numeric="" className="text-[0.6875rem] text-muted-foreground">
-                      {formatPercent(arm.credibleInterval[0], 2)} – {formatPercent(arm.credibleInterval[1], 2)}
+                      {formatPercent(arm.credibleInterval[0], 2)} –{' '}
+                      {formatPercent(arm.credibleInterval[1], 2)}
                     </span>
                   </span>
                 </TableCell>

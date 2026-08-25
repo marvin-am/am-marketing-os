@@ -17,7 +17,8 @@ const ENTITY_LABELS_DE: Readonly<Record<RollupDimension, string>> = {
 
 const DESCRIPTIONS_DE: Readonly<Record<RollupDimension, string>> = {
   CAMPAIGN: 'Auslieferung, Leads und CRM-Ergebnisse je Kampagne.',
-  CREATIVE: 'Je ausgelieferter Creative-Version. Die Auslieferung steuert Meta — Unterschiede sind keine randomisierten Testergebnisse.',
+  CREATIVE:
+    'Je ausgelieferter Creative-Version. Die Auslieferung steuert Meta — Unterschiede sind keine randomisierten Testergebnisse.',
   FUNNEL: 'Je veröffentlichter Funnel-Version.',
   EXPERIMENT_ARM: 'Je Arm eines laufenden oder abgeschlossenen Experiments.',
 };

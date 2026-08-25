@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@am/ui';
+import { formatDate } from '@/lib/format';
 import type { CampaignRef, DateRange, FunnelVersionRef } from '@/server/analytics-port';
 import { RANGE_PRESETS } from './date-range';
 import { ALL_FILTER_VALUE } from './labels';
@@ -88,15 +89,15 @@ export function PerformanceFilters({
     [basePath, router],
   );
 
+  // Navigation happens beside the state update, never inside the updater, so
+  // React's double-invocation in development cannot fire two navigations.
   const update = React.useCallback(
     (patch: Partial<FilterState>, navigateNow = true) => {
-      setState((current) => {
-        const next = { ...current, ...patch };
-        if (navigateNow) navigate(next);
-        return next;
-      });
+      const next = { ...state, ...patch };
+      setState(next);
+      if (navigateNow) navigate(next);
     },
-    [navigate],
+    [navigate, state],
   );
 
   const customInvalid = state.presetId === 'benutzerdefiniert' && state.from > state.to;
@@ -196,7 +197,9 @@ export function PerformanceFilters({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
-          {pending ? 'Zeitraum wird angewendet …' : `Ausgewertet wird ${range.from} bis ${range.to}.`}
+          {pending
+            ? 'Zeitraum wird angewendet …'
+            : `Ausgewertet wird ${formatDate(range.from)} bis ${formatDate(range.to)}.`}
         </p>
         {state.presetId === 'benutzerdefiniert' ? (
           <div className="flex items-center gap-2">

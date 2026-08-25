@@ -50,9 +50,7 @@ describe('ExperimentVerdictPanel — PROVISIONAL', () => {
     expect(container.querySelector('[data-verdict="PROVISIONAL"]')).not.toBeNull();
     expect(screen.getAllByText('Vorläufig führend').length).toBeGreaterThan(0);
     expect(screen.getByText(/Dies ist kein Gewinner\./)).toBeInTheDocument();
-    expect(
-      screen.getByText(/CRM-Ergebnisse der Kohorte sind noch nicht reif/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/CRM-Ergebnisse der Kohorte sind noch nicht reif/)).toBeInTheDocument();
   });
 
   it('never renders a winner badge or a winning arm for an immature cohort', () => {

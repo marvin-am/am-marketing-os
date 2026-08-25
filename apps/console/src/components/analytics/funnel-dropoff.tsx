@@ -1,5 +1,18 @@
 import * as React from 'react';
-import { Alert, AlertDescription, AlertTitle, EmptyState, MetricTile, Section, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@am/ui';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  EmptyState,
+  MetricTile,
+  Section,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@am/ui';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { FunnelDropOff } from '@/server/analytics-port';
 import { FunnelStepChart } from './funnel-step-chart';
@@ -170,7 +183,9 @@ export function FunnelDropOffView({ dropOff }: FunnelDropOffViewProps): React.JS
           Vor der Auswertung ausgeschlossen:{' '}
           <span data-am-numeric="">{formatNumber(analysis.excludedEvents)}</span> Ereignisse aus
           nicht-produktivem Traffic (
-          {excludedEntries.map(([kind, count]) => `${kind}: ${formatNumber(count ?? 0)}`).join(', ')}
+          {excludedEntries
+            .map(([kind, count]) => `${kind}: ${formatNumber(count ?? 0)}`)
+            .join(', ')}
           ). Vorschau-, Bot-, interner und Test-Traffic erreicht keine Kennzahl.
         </p>
       ) : null}

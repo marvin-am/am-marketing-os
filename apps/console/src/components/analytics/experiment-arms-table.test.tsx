@@ -57,7 +57,9 @@ describe('ExperimentArmsTable', () => {
     const row = rowFor(container, leader?.arm_key ?? '');
 
     expect(row.textContent).toMatch(/\d+,\d{2} % – \d+,\d{2} %/);
-    expect(within(row).getByRole('img', { name: /Glaubwürdigkeitsintervall von/ })).toBeInTheDocument();
+    expect(
+      within(row).getByRole('img', { name: /Glaubwürdigkeitsintervall von/ }),
+    ).toBeInTheDocument();
     expect(row.textContent).toMatch(/\d+,\d %/);
   });
 
@@ -78,7 +80,9 @@ describe('ExperimentArmsTable', () => {
 
     const row = rowFor(container, belowSessions?.arm_key ?? '');
     expect(within(row).getAllByText('nicht erreicht').length).toBeGreaterThan(0);
-    expect(row.textContent).toContain(`/ ${thresholds.minSessionsPerArm.toLocaleString('de-DE')} Sessions`);
+    expect(row.textContent).toContain(
+      `/ ${thresholds.minSessionsPerArm.toLocaleString('de-DE')} Sessions`,
+    );
     expect(row.textContent).toContain(
       `/ ${thresholds.minConversionsPerArm.toLocaleString('de-DE')} Conversions`,
     );

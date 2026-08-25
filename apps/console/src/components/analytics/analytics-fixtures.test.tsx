@@ -4,6 +4,7 @@ import {
   createAnalyticsFixturePort,
   isoDateOfDay,
   dayIndexOf,
+  rollupsFromFixture,
 } from '@/server/analytics-fixtures';
 
 /**
@@ -117,6 +118,23 @@ describe('analytics fixture — performance', () => {
     const dropOff = await port.getFunnelDropOff(query);
     expect(dropOff.analysis.steps).toHaveLength(0);
     expect(dropOff.funnelVersionId).toBeNull();
+  });
+
+  it('aggregates to exactly what computeRollups derives from the same raw rows', async () => {
+    // The fixture pre-aggregates for cost reasons; this proves the shortcut is
+    // arithmetically identical to running the package over the raw events.
+    const range = rangeEndingNow(7);
+    const breakdowns = await port.getBreakdowns({ range, now: NOW });
+    const fromCells = breakdowns.find((breakdown) => breakdown.dimension === 'CAMPAIGN');
+    const fromEvents = rollupsFromFixture('CAMPAIGN', range, NOW);
+
+    expect(fromEvents.cumulative.length).toBe(fromCells?.rows.length);
+    for (const rollup of fromEvents.cumulative) {
+      const row = fromCells?.rows.find((candidate) => candidate.key === rollup.key);
+      expect(row, `Kampagne ${rollup.key} fehlt in der Aufschlüsselung`).toBeDefined();
+      expect(row?.counters).toEqual(rollup.counters);
+      expect(row?.attributionCoverage).toBeCloseTo(rollup.attributionCoverage ?? 0, 10);
+    }
   });
 
   it('answers the full 18-month range without expanding raw events', async () => {

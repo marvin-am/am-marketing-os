@@ -19,7 +19,10 @@ import {
   ExperimentArmMetricsTable,
   ExperimentArmsTable,
 } from '@/components/analytics/experiment-arms-table';
-import { ExperimentVerdictBadge, ExperimentVerdictPanel } from '@/components/analytics/experiment-verdict';
+import {
+  ExperimentVerdictBadge,
+  ExperimentVerdictPanel,
+} from '@/components/analytics/experiment-verdict';
 import { requireUser } from '@/lib/action';
 import { formatCurrencyMinor, formatDate, formatDuration, formatNumber } from '@/lib/format';
 import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
@@ -27,7 +30,9 @@ import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
 function Detail({ labelDe, children }: { labelDe: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{labelDe}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {labelDe}
+      </dt>
       <dd className="text-sm text-foreground">{children}</dd>
     </div>
   );
@@ -60,7 +65,9 @@ export default async function ExperimentDetailPage({
     .map((observation) => observation.attribution_coverage)
     .filter((value): value is number => value !== null && value !== undefined);
   const averageCoverage =
-    coverages.length > 0 ? coverages.reduce((sum, value) => sum + value, 0) / coverages.length : null;
+    coverages.length > 0
+      ? coverages.reduce((sum, value) => sum + value, 0) / coverages.length
+      : null;
 
   return (
     <div className="flex flex-col gap-8">

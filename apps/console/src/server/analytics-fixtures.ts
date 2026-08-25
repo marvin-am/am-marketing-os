@@ -247,7 +247,7 @@ const FUNNEL_VERSIONS: FixtureFunnelVersion[] = [
     kind: 'MULTI_STEP_FORM',
     steps: FORM_STEPS_LONG,
     formStartFactor: 0.94,
-    submissionFactor: 0.70,
+    submissionFactor: 0.7,
   },
   {
     id: 'fv-hybrid-v4',
@@ -288,7 +288,11 @@ interface StepChainEntry {
   completed: number;
 }
 
-function buildStepChain(formStarts: number, stepCount: number, targetLeads: number): StepChainEntry[] {
+function buildStepChain(
+  formStarts: number,
+  stepCount: number,
+  targetLeads: number,
+): StepChainEntry[] {
   const overall = formStarts > 0 ? Math.min(1, targetLeads / formStarts) : 0;
   const keeps = stepKeepRates(stepCount, overall);
   const chain: StepChainEntry[] = [];
@@ -302,15 +306,69 @@ function buildStepChain(formStarts: number, stepCount: number, targetLeads: numb
 }
 
 const CREATIVES: FixtureCreative[] = [
-  { id: 'cv-problem-statisch-45', labelDe: 'Problem/Pain – statisch 4:5', weight: 0.34, ctrFactor: 1.0, conversionFactor: 0.96 },
-  { id: 'cv-ergebnis-video-916', labelDe: 'Konkretes Ergebnis – Video 9:16', weight: 0.38, ctrFactor: 1.22, conversionFactor: 1.12 },
-  { id: 'cv-kundenstimme-11', labelDe: 'Kundenstimme – statisch 1:1', weight: 0.28, ctrFactor: 0.87, conversionFactor: 1.04 },
-  { id: 'cv-vergleich-karussell', labelDe: 'Vergleich Alternative – Karussell', weight: 0.31, ctrFactor: 0.94, conversionFactor: 0.9 },
-  { id: 'cv-einwand-video-45', labelDe: 'Einwandbehandlung – Video 4:5', weight: 0.33, ctrFactor: 1.08, conversionFactor: 1.06 },
-  { id: 'cv-kontraintuitiv-statisch', labelDe: 'Kontraintuitive These – statisch 4:5', weight: 0.36, ctrFactor: 1.15, conversionFactor: 0.94 },
-  { id: 'cv-zahlenbeleg-11', labelDe: 'Datenpunkt/Beleg – statisch 1:1', weight: 0.3, ctrFactor: 0.92, conversionFactor: 1.09 },
-  { id: 'cv-kurzumfrage-video', labelDe: 'Kurzumfrage – Video 9:16', weight: 0.5, ctrFactor: 1.05, conversionFactor: 0.98 },
-  { id: 'cv-kurzumfrage-statisch', labelDe: 'Kurzumfrage – statisch 4:5', weight: 0.5, ctrFactor: 0.95, conversionFactor: 1.02 },
+  {
+    id: 'cv-problem-statisch-45',
+    labelDe: 'Problem/Pain – statisch 4:5',
+    weight: 0.34,
+    ctrFactor: 1.0,
+    conversionFactor: 0.96,
+  },
+  {
+    id: 'cv-ergebnis-video-916',
+    labelDe: 'Konkretes Ergebnis – Video 9:16',
+    weight: 0.38,
+    ctrFactor: 1.22,
+    conversionFactor: 1.12,
+  },
+  {
+    id: 'cv-kundenstimme-11',
+    labelDe: 'Kundenstimme – statisch 1:1',
+    weight: 0.28,
+    ctrFactor: 0.87,
+    conversionFactor: 1.04,
+  },
+  {
+    id: 'cv-vergleich-karussell',
+    labelDe: 'Vergleich Alternative – Karussell',
+    weight: 0.31,
+    ctrFactor: 0.94,
+    conversionFactor: 0.9,
+  },
+  {
+    id: 'cv-einwand-video-45',
+    labelDe: 'Einwandbehandlung – Video 4:5',
+    weight: 0.33,
+    ctrFactor: 1.08,
+    conversionFactor: 1.06,
+  },
+  {
+    id: 'cv-kontraintuitiv-statisch',
+    labelDe: 'Kontraintuitive These – statisch 4:5',
+    weight: 0.36,
+    ctrFactor: 1.15,
+    conversionFactor: 0.94,
+  },
+  {
+    id: 'cv-zahlenbeleg-11',
+    labelDe: 'Datenpunkt/Beleg – statisch 1:1',
+    weight: 0.3,
+    ctrFactor: 0.92,
+    conversionFactor: 1.09,
+  },
+  {
+    id: 'cv-kurzumfrage-video',
+    labelDe: 'Kurzumfrage – Video 9:16',
+    weight: 0.5,
+    ctrFactor: 1.05,
+    conversionFactor: 0.98,
+  },
+  {
+    id: 'cv-kurzumfrage-statisch',
+    labelDe: 'Kurzumfrage – statisch 4:5',
+    weight: 0.5,
+    ctrFactor: 0.95,
+    conversionFactor: 1.02,
+  },
 ];
 
 const CREATIVE_BY_ID = new Map(CREATIVES.map((c) => [c.id, c]));
@@ -721,7 +779,10 @@ function lanesFor(campaign: FixtureCampaign, offset: number): Lane[] {
 }
 
 /** Draws one attribution confidence from the campaign's mix. */
-function drawConfidence(random: () => number, mix: FixtureCampaign['confidenceMix']): AttributionConfidence {
+function drawConfidence(
+  random: () => number,
+  mix: FixtureCampaign['confidenceMix'],
+): AttributionConfidence {
   const draw = random();
   let cumulative = 0;
   for (let i = 0; i < mix.length; i++) {
@@ -748,7 +809,9 @@ function buildCell(
   nowIndex: number,
 ): DailyCell {
   const date = isoDateOfDay(dayIndex);
-  const random = mulberry32(seedFrom([campaign.id, lane.funnelVersionId, lane.experimentArmId ?? '-', creative.id, date]));
+  const random = mulberry32(
+    seedFrom([campaign.id, lane.funnelVersionId, lane.experimentArmId ?? '-', creative.id, date]),
+  );
   const funnel = FUNNEL_BY_ID.get(lane.funnelVersionId);
   if (!funnel) throw new Error(`Unknown funnel version ${lane.funnelVersionId}`);
 
@@ -766,7 +829,9 @@ function buildCell(
   const impressions = cpmMinor > 0 ? Math.round((spendMinor / cpmMinor) * 1000) : 0;
   const ctr = between(random, campaign.ctr[0], campaign.ctr[1]) * creative.ctrFactor;
   const linkClicks = Math.round(impressions * ctr);
-  const funnelSessions = Math.round(linkClicks * campaign.landingRate * between(random, 0.96, 1.04));
+  const funnelSessions = Math.round(
+    linkClicks * campaign.landingRate * between(random, 0.96, 1.04),
+  );
   const formStarts = Math.round(
     funnelSessions * campaign.formStartRate * funnel.formStartFactor * between(random, 0.94, 1.06),
   );
@@ -798,11 +863,25 @@ function buildCell(
   const eventualWon = eventualOpportunities * campaign.closeRate;
 
   const vqScheduled = roundStochastic(eventualScheduled * realisedShare(ageDays, 8), random);
-  const vqAttended = Math.min(vqScheduled, roundStochastic(eventualAttended * realisedShare(ageDays, 15), random));
-  const qualifiedVq = Math.min(vqAttended, roundStochastic(eventualQualified * realisedShare(ageDays, 20), random));
-  const opportunities = Math.min(qualifiedVq, roundStochastic(eventualOpportunities * realisedShare(ageDays, 28), random));
-  const closedWon = Math.min(opportunities, roundStochastic(eventualWon * realisedShare(ageDays, 52), random));
-  const revenueMinor = Math.round(closedWon * campaign.dealValueMinor * between(random, 0.82, 1.28));
+  const vqAttended = Math.min(
+    vqScheduled,
+    roundStochastic(eventualAttended * realisedShare(ageDays, 15), random),
+  );
+  const qualifiedVq = Math.min(
+    vqAttended,
+    roundStochastic(eventualQualified * realisedShare(ageDays, 20), random),
+  );
+  const opportunities = Math.min(
+    qualifiedVq,
+    roundStochastic(eventualOpportunities * realisedShare(ageDays, 28), random),
+  );
+  const closedWon = Math.min(
+    opportunities,
+    roundStochastic(eventualWon * realisedShare(ageDays, 52), random),
+  );
+  const revenueMinor = Math.round(
+    closedWon * campaign.dealValueMinor * between(random, 0.82, 1.28),
+  );
 
   const confidences: AttributionConfidence[] = [];
   for (let i = 0; i < leads; i++) confidences.push(drawConfidence(random, campaign.confidenceMix));
@@ -879,7 +958,14 @@ function buildDataset(now: IsoTimestamp): FixtureDataset {
         const weightSum = laneCreatives.reduce((sum, c) => sum + c.weight, 0);
         for (const creative of laneCreatives) {
           cells.push(
-            buildCell(campaign, lane, creative, weightSum > 0 ? creative.weight / weightSum : 0, dayIndex, nowIndex),
+            buildCell(
+              campaign,
+              lane,
+              creative,
+              weightSum > 0 ? creative.weight / weightSum : 0,
+              dayIndex,
+              nowIndex,
+            ),
           );
         }
       }
@@ -909,7 +995,11 @@ function dataset(now: IsoTimestamp): FixtureDataset {
 const CRM_MATURITY_DAYS = DEFAULT_EXPERIMENT_THRESHOLDS.crmMaturityDays;
 const CURRENCY = 'EUR';
 
-function maturityFor(cohortDate: IsoDate, now: IsoTimestamp, observedOutcomes: number): MaturityAssessment {
+function maturityFor(
+  cohortDate: IsoDate,
+  now: IsoTimestamp,
+  observedOutcomes: number,
+): MaturityAssessment {
   const input: MaturityInput = {
     cohortStartedAt: startOfDayIso(cohortDate),
     now,
@@ -955,13 +1045,23 @@ function snapshotOf(cells: readonly DailyCell[], now: IsoTimestamp): MetricSnaps
   let weakest: MaturityAssessment | null = null;
   for (const day of days) {
     const dayCells = byDay.get(day) ?? [];
-    const assessment = maturityFor(day, now, outcomesOf(sumCounters(dayCells.map((c) => c.counters))));
+    const assessment = maturityFor(
+      day,
+      now,
+      outcomesOf(sumCounters(dayCells.map((c) => c.counters))),
+    );
     if (!weakest || MATURITY_ORDER[assessment.maturity] < MATURITY_ORDER[weakest.maturity]) {
       weakest = assessment;
     }
   }
   const maturityAssessment =
-    weakest ?? assessMaturity({ cohortStartedAt, now, crmMaturityDays: CRM_MATURITY_DAYS, observedOutcomes: 0 });
+    weakest ??
+    assessMaturity({
+      cohortStartedAt,
+      now,
+      crmMaturityDays: CRM_MATURITY_DAYS,
+      observedOutcomes: 0,
+    });
 
   const ctx: MetricContext = {
     crmMaturity: maturityAssessment.maturity,
@@ -983,7 +1083,11 @@ function snapshotOf(cells: readonly DailyCell[], now: IsoTimestamp): MetricSnaps
 
 function emptySnapshot(now: IsoTimestamp, cohortDate: IsoDate): MetricSnapshot {
   const assessment = maturityFor(cohortDate, now, 0);
-  const ctx: MetricContext = { crmMaturity: assessment.maturity, attributionCoverage: null, currency: CURRENCY };
+  const ctx: MetricContext = {
+    crmMaturity: assessment.maturity,
+    attributionCoverage: null,
+    currency: CURRENCY,
+  };
   const counters = emptyCounters();
   return {
     counters,
@@ -1018,7 +1122,10 @@ export const FUNNEL_KIND_LABELS_DE: Readonly<Record<FunnelKind, string>> = {
   HYBRID: 'Hybrid',
 };
 
-function labelForDimension(dimension: RollupDimension, key: string): { labelDe: string; contextDe: string | null; experimentId: string | null } {
+function labelForDimension(
+  dimension: RollupDimension,
+  key: string,
+): { labelDe: string; contextDe: string | null; experimentId: string | null } {
   switch (dimension) {
     case 'CAMPAIGN': {
       const campaign = CAMPAIGN_BY_ID.get(key);
@@ -1067,7 +1174,9 @@ function dimensionKeyOf(cell: DailyCell, dimension: RollupDimension): string | n
 /** Raw event retention. Beyond this the step analysis has nothing to read. */
 export const EVENT_WINDOW_DAYS = 31;
 
-const VALIDATION_PROFILE: Readonly<Record<string, Array<{ fieldId: string; errorCode: ValidationErrorCode; weight: number }>>> = {
+const VALIDATION_PROFILE: Readonly<
+  Record<string, Array<{ fieldId: string; errorCode: ValidationErrorCode; weight: number }>>
+> = {
   kontakt: [
     { fieldId: 'email', errorCode: 'INVALID_EMAIL', weight: 0.34 },
     { fieldId: 'telefon', errorCode: 'INVALID_PHONE', weight: 0.27 },
@@ -1087,7 +1196,9 @@ function pickValidationFailure(
   stepKey: string,
   random: () => number,
 ): { fieldId: string; errorCode: ValidationErrorCode } {
-  const profile = VALIDATION_PROFILE[stepKey] ?? [{ fieldId: stepKey, errorCode: 'REQUIRED' as const, weight: 1 }];
+  const profile = VALIDATION_PROFILE[stepKey] ?? [
+    { fieldId: stepKey, errorCode: 'REQUIRED' as const, weight: 1 },
+  ];
   const total = profile.reduce((sum, entry) => sum + entry.weight, 0);
   let draw = random() * total;
   for (const entry of profile) {
@@ -1122,7 +1233,15 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
   for (const cell of cells) {
     const funnel = FUNNEL_BY_ID.get(cell.funnelVersionId);
     if (!funnel) continue;
-    const random = mulberry32(seedFrom(['events', cell.date, cell.campaignId, cell.creativeVersionId, cell.funnelVersionId]));
+    const random = mulberry32(
+      seedFrom([
+        'events',
+        cell.date,
+        cell.campaignId,
+        cell.creativeVersionId,
+        cell.funnelVersionId,
+      ]),
+    );
     const occurredAt = `${cell.date}T09:00:00.000Z`;
     const keys = {
       campaign_id: cell.campaignId,
@@ -1139,7 +1258,10 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
       spend_minor: cell.counters.spendMinor,
     });
 
-    const prefix = `${cell.date}-${cell.creativeVersionId}-${cell.funnelVersionId}`;
+    // Session ids must be unique across cells: two campaigns can run the same
+    // creative on the same funnel on the same day, and a collision would make
+    // `computeRollups` count one session twice.
+    const prefix = `${cell.date}-${cell.campaignId}-${cell.creativeVersionId}-${cell.funnelVersionId}-${cell.experimentArmId ?? 'none'}`;
     for (let i = 0; i < cell.counters.funnelSessions; i++) {
       const sessionId = `${prefix}-s${i}`;
       funnelEvents.push({
@@ -1148,7 +1270,13 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
         traffic_kind: 'PRODUCTION',
         session_id: sessionId,
       });
-      rollupEvents.push({ ...keys, event_type: 'funnel_viewed', occurred_at: occurredAt, traffic_kind: 'PRODUCTION', session_id: sessionId });
+      rollupEvents.push({
+        ...keys,
+        event_type: 'funnel_viewed',
+        occurred_at: occurredAt,
+        traffic_kind: 'PRODUCTION',
+        session_id: sessionId,
+      });
       funnelEvents.push({
         event_type: 'form_viewed',
         occurred_at: occurredAt,
@@ -1166,15 +1294,37 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
     for (const [kind, count] of excluded) {
       for (let i = 0; i < count; i++) {
         const sessionId = `${prefix}-${kind.toLowerCase()}${i}`;
-        funnelEvents.push({ event_type: 'funnel_viewed', occurred_at: occurredAt, traffic_kind: kind, session_id: sessionId });
-        rollupEvents.push({ ...keys, event_type: 'funnel_viewed', occurred_at: occurredAt, traffic_kind: kind, session_id: sessionId });
+        funnelEvents.push({
+          event_type: 'funnel_viewed',
+          occurred_at: occurredAt,
+          traffic_kind: kind,
+          session_id: sessionId,
+        });
+        rollupEvents.push({
+          ...keys,
+          event_type: 'funnel_viewed',
+          occurred_at: occurredAt,
+          traffic_kind: kind,
+          session_id: sessionId,
+        });
       }
     }
 
     for (let i = 0; i < cell.counters.formStarts; i++) {
       const sessionId = `${prefix}-s${i}`;
-      funnelEvents.push({ event_type: 'form_started', occurred_at: occurredAt, traffic_kind: 'PRODUCTION', session_id: sessionId });
-      rollupEvents.push({ ...keys, event_type: 'form_started', occurred_at: occurredAt, traffic_kind: 'PRODUCTION', session_id: sessionId });
+      funnelEvents.push({
+        event_type: 'form_started',
+        occurred_at: occurredAt,
+        traffic_kind: 'PRODUCTION',
+        session_id: sessionId,
+      });
+      rollupEvents.push({
+        ...keys,
+        event_type: 'form_started',
+        occurred_at: occurredAt,
+        traffic_kind: 'PRODUCTION',
+        session_id: sessionId,
+      });
     }
 
     funnel.steps.forEach((step, index) => {
@@ -1191,7 +1341,14 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
           session_id: sessionId,
           step_id: step.key,
         });
-        rollupEvents.push({ ...keys, event_type: 'form_step_viewed', occurred_at: stepTime, traffic_kind: 'PRODUCTION', session_id: sessionId, step_id: step.key });
+        rollupEvents.push({
+          ...keys,
+          event_type: 'form_step_viewed',
+          occurred_at: stepTime,
+          traffic_kind: 'PRODUCTION',
+          session_id: sessionId,
+          step_id: step.key,
+        });
         if (i < completed) {
           funnelEvents.push({
             event_type: 'form_step_completed',
@@ -1200,7 +1357,14 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
             session_id: sessionId,
             step_id: step.key,
           });
-          rollupEvents.push({ ...keys, event_type: 'form_step_completed', occurred_at: stepTime, traffic_kind: 'PRODUCTION', session_id: sessionId, step_id: step.key });
+          rollupEvents.push({
+            ...keys,
+            event_type: 'form_step_completed',
+            occurred_at: stepTime,
+            traffic_kind: 'PRODUCTION',
+            session_id: sessionId,
+            step_id: step.key,
+          });
         } else if (random() < 0.55) {
           // People who leave a step usually leave it on a validation error.
           const failure = pickValidationFailure(step.key, random);
@@ -1227,7 +1391,14 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
         session_id: sessionId,
         submission_id: submissionId,
       });
-      rollupEvents.push({ ...keys, event_type: 'lead_submitted', occurred_at: occurredAt, traffic_kind: 'PRODUCTION', session_id: sessionId, submission_id: submissionId });
+      rollupEvents.push({
+        ...keys,
+        event_type: 'lead_submitted',
+        occurred_at: occurredAt,
+        traffic_kind: 'PRODUCTION',
+        session_id: sessionId,
+        submission_id: submissionId,
+      });
       crmRecords.push({
         ...keys,
         submission_id: submissionId,
@@ -1254,7 +1425,10 @@ function expandEvents(cells: readonly DailyCell[]): GeneratedEvents {
 /* Experiments                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function experimentEvaluationInstant(experiment: FixtureExperiment, data: FixtureDataset): IsoTimestamp {
+function experimentEvaluationInstant(
+  experiment: FixtureExperiment,
+  data: FixtureDataset,
+): IsoTimestamp {
   if (experiment.concludedOffset === null) return data.nowIso;
   return startOfDayIso(isoDateOfDay(data.nowIndex + experiment.concludedOffset));
 }
@@ -1266,7 +1440,11 @@ function experimentEvaluationInstant(experiment: FixtureExperiment, data: Fixtur
  * today: that reproduces the decision that was actually taken, and it keeps the
  * CRM outcomes consistent with the maturity the verdict was based on.
  */
-function observationsFor(experiment: FixtureExperiment, data: FixtureDataset, asOf: IsoTimestamp): ArmObservation[] {
+function observationsFor(
+  experiment: FixtureExperiment,
+  data: FixtureDataset,
+  asOf: IsoTimestamp,
+): ArmObservation[] {
   const asOfIndex = dayIndexOf(asOf);
   const campaign = CAMPAIGN_BY_ID.get(experiment.campaignId);
   if (!campaign) return [];
@@ -1276,7 +1454,9 @@ function observationsFor(experiment: FixtureExperiment, data: FixtureDataset, as
     for (let offset = experiment.startOffset; offset <= experiment.endOffset; offset++) {
       const dayIndex = data.nowIndex + offset;
       if (dayIndex > asOfIndex) continue;
-      const lane = lanesFor(campaign, offset).find((candidate) => candidate.experimentArmId === arm.id);
+      const lane = lanesFor(campaign, offset).find(
+        (candidate) => candidate.experimentArmId === arm.id,
+      );
       if (!lane) continue;
       const laneCreatives = lane.creativeIds
         .map((id) => CREATIVE_BY_ID.get(id))
@@ -1284,7 +1464,14 @@ function observationsFor(experiment: FixtureExperiment, data: FixtureDataset, as
       const weightSum = laneCreatives.reduce((sum, c) => sum + c.weight, 0);
       for (const creative of laneCreatives) {
         cells.push(
-          buildCell(campaign, lane, creative, weightSum > 0 ? creative.weight / weightSum : 0, dayIndex, asOfIndex),
+          buildCell(
+            campaign,
+            lane,
+            creative,
+            weightSum > 0 ? creative.weight / weightSum : 0,
+            dayIndex,
+            asOfIndex,
+          ),
         );
       }
     }
@@ -1355,7 +1542,13 @@ function toDomainArms(fixture: FixtureExperiment, data: FixtureDataset): Experim
 function evaluateFixtureExperiment(
   fixture: FixtureExperiment,
   data: FixtureDataset,
-): { experiment: Experiment; arms: ExperimentArm[]; observations: ArmObservation[]; evaluation: ExperimentEvaluation; asOf: IsoTimestamp } {
+): {
+  experiment: Experiment;
+  arms: ExperimentArm[];
+  observations: ArmObservation[];
+  evaluation: ExperimentEvaluation;
+  asOf: IsoTimestamp;
+} {
   const asOf = experimentEvaluationInstant(fixture, data);
   const experiment = toDomainExperiment(fixture, data);
   const observations = observationsFor(fixture, data, asOf);
@@ -1416,9 +1609,27 @@ const LEARNING_SEEDS: LearningSeed[] = [
     outcomeDe:
       'Die kurze Variante hob die Submission-Rate um rund ein Drittel, ohne die Qualifizierungsquote der Leads zu senken. Die Kosten je qualifiziertem VQ sanken entsprechend.',
     outcomeFacts: [
-      { label: 'Submission-Rate Variante', numerator: 89, denominator: 2_471, value: 0.036, unit: '%' },
-      { label: 'Submission-Rate Kontrolle', numerator: 63, denominator: 2_412, value: 0.0261, unit: '%' },
-      { label: 'Qualifizierte VQs Variante', numerator: 31, denominator: 54, value: 0.5741, unit: '%' },
+      {
+        label: 'Submission-Rate Variante',
+        numerator: 89,
+        denominator: 2_471,
+        value: 0.036,
+        unit: '%',
+      },
+      {
+        label: 'Submission-Rate Kontrolle',
+        numerator: 63,
+        denominator: 2_412,
+        value: 0.0261,
+        unit: '%',
+      },
+      {
+        label: 'Qualifizierte VQs Variante',
+        numerator: 31,
+        denominator: 54,
+        value: 0.5741,
+        unit: '%',
+      },
     ],
     dataMaturity: 'MATURE',
     attributionLevel: 'REVENUE_LINKED',
@@ -1447,8 +1658,20 @@ const LEARNING_SEEDS: LearningSeed[] = [
     outcomeDe:
       'Die Variante mit Gate lag unter der Kontrolle, verfehlte die geforderte Gewinnwahrscheinlichkeit aber deutlich — das Ergebnis ist nicht eindeutig. Die Arme messen zudem unterschiedliche Grundgesamtheiten, weil das Gate die Zulassung verändert.',
     outcomeFacts: [
-      { label: 'Submission-Rate mit Gate', numerator: 60, denominator: 2_249, value: 0.0267, unit: '%' },
-      { label: 'Submission-Rate ohne Gate', numerator: 78, denominator: 2_302, value: 0.0339, unit: '%' },
+      {
+        label: 'Submission-Rate mit Gate',
+        numerator: 60,
+        denominator: 2_249,
+        value: 0.0267,
+        unit: '%',
+      },
+      {
+        label: 'Submission-Rate ohne Gate',
+        numerator: 78,
+        denominator: 2_302,
+        value: 0.0339,
+        unit: '%',
+      },
     ],
     dataMaturity: 'MATURE',
     attributionLevel: 'LEAD_LINKED',
@@ -1477,9 +1700,27 @@ const LEARNING_SEEDS: LearningSeed[] = [
     outcomeDe:
       'Die Variante führt bei der Submission-Rate. Die CRM-Ergebnisse der Kohorte sind noch nicht reif, und weil Angebot und Funnel gemeinsam variieren, lässt sich der Effekt keiner der beiden Komponenten zuordnen.',
     outcomeFacts: [
-      { label: 'Submission-Rate Variante', numerator: 76, denominator: 1_531, value: 0.0496, unit: '%' },
-      { label: 'Submission-Rate Kontrolle', numerator: 54, denominator: 1_503, value: 0.0359, unit: '%' },
-      { label: 'Qualifizierte VQs (bisher)', numerator: 11, denominator: 34, value: 0.3235, unit: '%' },
+      {
+        label: 'Submission-Rate Variante',
+        numerator: 76,
+        denominator: 1_531,
+        value: 0.0496,
+        unit: '%',
+      },
+      {
+        label: 'Submission-Rate Kontrolle',
+        numerator: 54,
+        denominator: 1_503,
+        value: 0.0359,
+        unit: '%',
+      },
+      {
+        label: 'Qualifizierte VQs (bisher)',
+        numerator: 11,
+        denominator: 34,
+        value: 0.3235,
+        unit: '%',
+      },
     ],
     dataMaturity: 'PARTIAL',
     attributionLevel: 'LEAD_LINKED',
@@ -1508,8 +1749,20 @@ const LEARNING_SEEDS: LearningSeed[] = [
     outcomeDe:
       'Das Video mit konkretem Ergebnis erzielte die höchste CTR und den niedrigsten CPC. Die Auslieferung wurde von Meta optimiert, es handelt sich nicht um einen randomisierten Test.',
     outcomeFacts: [
-      { label: 'CTR Video „Konkretes Ergebnis“', numerator: 6_842, denominator: 412_390, value: 0.0166, unit: '%' },
-      { label: 'CTR statisch „Datenpunkt“', numerator: 3_918, denominator: 318_204, value: 0.0123, unit: '%' },
+      {
+        label: 'CTR Video „Konkretes Ergebnis“',
+        numerator: 6_842,
+        denominator: 412_390,
+        value: 0.0166,
+        unit: '%',
+      },
+      {
+        label: 'CTR statisch „Datenpunkt“',
+        numerator: 3_918,
+        denominator: 318_204,
+        value: 0.0123,
+        unit: '%',
+      },
     ],
     dataMaturity: 'MATURE',
     attributionLevel: 'TRAFFIC_LINKED',
@@ -1538,8 +1791,20 @@ const LEARNING_SEEDS: LearningSeed[] = [
     outcomeDe:
       'Leads vom Samstag und Sonntag terminierten seltener einen VQ als Leads von Montag bis Donnerstag. Der Unterschied ist über beide Laufzeiten stabil.',
     outcomeFacts: [
-      { label: 'VQ-Terminierungsrate Mo–Do', numerator: 612, denominator: 1_042, value: 0.5873, unit: '%' },
-      { label: 'VQ-Terminierungsrate Sa–So', numerator: 118, denominator: 286, value: 0.4126, unit: '%' },
+      {
+        label: 'VQ-Terminierungsrate Mo–Do',
+        numerator: 612,
+        denominator: 1_042,
+        value: 0.5873,
+        unit: '%',
+      },
+      {
+        label: 'VQ-Terminierungsrate Sa–So',
+        numerator: 118,
+        denominator: 286,
+        value: 0.4126,
+        unit: '%',
+      },
     ],
     dataMaturity: 'MATURE',
     attributionLevel: 'LEAD_LINKED',
@@ -1568,8 +1833,20 @@ const LEARNING_SEEDS: LearningSeed[] = [
     outcomeDe:
       'Der Schritt „Budgetrahmen“ weist die höchste Abbruchrate aller Schritte auf. Ein kontrollierter Test dazu läuft nicht — dies ist eine Beobachtung, keine gemessene Wirkung.',
     outcomeFacts: [
-      { label: 'Abbruchrate Schritt „Budgetrahmen“', numerator: 214, denominator: 618, value: 0.3463, unit: '%' },
-      { label: 'Abbruchrate Schritt „Branche“', numerator: 71, denominator: 812, value: 0.0874, unit: '%' },
+      {
+        label: 'Abbruchrate Schritt „Budgetrahmen“',
+        numerator: 214,
+        denominator: 618,
+        value: 0.3463,
+        unit: '%',
+      },
+      {
+        label: 'Abbruchrate Schritt „Branche“',
+        numerator: 71,
+        denominator: 812,
+        value: 0.0874,
+        unit: '%',
+      },
     ],
     dataMaturity: 'IMMATURE',
     attributionLevel: 'TRAFFIC_LINKED',
@@ -1623,7 +1900,11 @@ function toLearningCard(seed: LearningSeed, data: FixtureDataset): LearningCard 
 /* The port implementation                                                     */
 /* -------------------------------------------------------------------------- */
 
-function crmDelayFor(range: DateRange, cells: readonly DailyCell[], now: IsoTimestamp): CrmDelayStatement {
+function crmDelayFor(
+  range: DateRange,
+  cells: readonly DailyCell[],
+  now: IsoTimestamp,
+): CrmDelayStatement {
   const from = dayIndexOf(range.from);
   const to = dayIndexOf(range.to);
   const nowIndex = dayIndexOf(now);
@@ -1637,16 +1918,22 @@ function crmDelayFor(range: DateRange, cells: readonly DailyCell[], now: IsoTime
   for (let index = from; index <= to; index++) {
     const date = isoDateOfDay(index);
     const dayCells = byDay.get(date) ?? [];
-    const assessment = maturityFor(date, now, outcomesOf(sumCounters(dayCells.map((c) => c.counters))));
+    const assessment = maturityFor(
+      date,
+      now,
+      outcomesOf(sumCounters(dayCells.map((c) => c.counters))),
+    );
     if (assessment.maturity === 'MATURE') mature += 1;
     else if (assessment.maturity === 'PARTIAL') partial += 1;
     else immature += 1;
-    if (!weakest || MATURITY_ORDER[assessment.maturity] < MATURITY_ORDER[weakest.maturity]) weakest = assessment;
+    if (!weakest || MATURITY_ORDER[assessment.maturity] < MATURITY_ORDER[weakest.maturity])
+      weakest = assessment;
   }
 
   const totalDays = Math.max(0, to - from + 1);
   const cutoffIndex = nowIndex - CRM_MATURITY_DAYS;
-  const maturityCutoff = cutoffIndex >= from && cutoffIndex <= to ? isoDateOfDay(cutoffIndex + 1) : null;
+  const maturityCutoff =
+    cutoffIndex >= from && cutoffIndex <= to ? isoDateOfDay(cutoffIndex + 1) : null;
 
   return {
     crmMaturityDays: CRM_MATURITY_DAYS,
@@ -1765,7 +2052,10 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
           };
         });
 
-        rows.sort((a, b) => b.counters.spendMinor - a.counters.spendMinor || a.labelDe.localeCompare(b.labelDe));
+        rows.sort(
+          (a, b) =>
+            b.counters.spendMinor - a.counters.spendMinor || a.labelDe.localeCompare(b.labelDe),
+        );
         return { dimension, rows };
       });
     },
@@ -1793,13 +2083,19 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
       if (!funnelVersionId) {
         const byFunnel = new Map<string, number>();
         for (const cell of windowCells) {
-          byFunnel.set(cell.funnelVersionId, (byFunnel.get(cell.funnelVersionId) ?? 0) + cell.counters.formStarts);
+          byFunnel.set(
+            cell.funnelVersionId,
+            (byFunnel.get(cell.funnelVersionId) ?? 0) + cell.counters.formStarts,
+          );
         }
         funnelVersionId =
-          [...byFunnel.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+          [...byFunnel.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ??
+          null;
       }
 
-      const selected = funnelVersionId ? windowCells.filter((cell) => cell.funnelVersionId === funnelVersionId) : [];
+      const selected = funnelVersionId
+        ? windowCells.filter((cell) => cell.funnelVersionId === funnelVersionId)
+        : [];
       const funnel = funnelVersionId ? FUNNEL_BY_ID.get(funnelVersionId) : undefined;
       const { funnelEvents } = expandEvents(selected);
 
@@ -1815,7 +2111,9 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
           ? `Ereignis-Rohdaten stehen für maximal ${EVENT_WINDOW_DAYS} Tage zur Verfügung. Die Schritt-Analyse zeigt daher den Zeitraum ${window.from} bis ${window.to}, nicht den vollen gewählten Zeitraum.`
           : null,
         funnelVersionId,
-        funnelLabelDe: funnel ? `${funnel.labelDe} · ${FUNNEL_KIND_LABELS_DE[funnel.kind]}` : 'Kein Funnel mit Formularverkehr',
+        funnelLabelDe: funnel
+          ? `${funnel.labelDe} · ${FUNNEL_KIND_LABELS_DE[funnel.kind]}`
+          : 'Kein Funnel mit Formularverkehr',
         stepLabelsDe,
       };
     },
@@ -1824,7 +2122,10 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
       const resolved = resolveNow(now);
       const data = dataset(resolved);
       return EXPERIMENTS.map((fixture) => {
-        const { experiment, arms, observations, evaluation } = evaluateFixtureExperiment(fixture, data);
+        const { experiment, arms, observations, evaluation } = evaluateFixtureExperiment(
+          fixture,
+          data,
+        );
         const campaign = CAMPAIGN_BY_ID.get(fixture.campaignId);
         const winningArm = evaluation.result.winning_arm_id
           ? arms.find((arm) => arm.id === evaluation.result.winning_arm_id)
@@ -1838,7 +2139,9 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
           campaignLabelDe: campaign?.labelDe ?? fixture.campaignId,
           winningArmLabelDe: winningArm?.label ?? null,
         };
-      }).sort((a, b) => (b.experiment.started_at ?? '').localeCompare(a.experiment.started_at ?? ''));
+      }).sort((a, b) =>
+        (b.experiment.started_at ?? '').localeCompare(a.experiment.started_at ?? ''),
+      );
     },
 
     async getExperiment(id: string, now: IsoTimestamp): Promise<ExperimentDetail | null> {
@@ -1847,7 +2150,10 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
       const fixture = EXPERIMENTS.find((candidate) => candidate.id === id);
       if (!fixture) return null;
 
-      const { experiment, arms, observations, evaluation, asOf } = evaluateFixtureExperiment(fixture, data);
+      const { experiment, arms, observations, evaluation, asOf } = evaluateFixtureExperiment(
+        fixture,
+        data,
+      );
       const campaign = CAMPAIGN_BY_ID.get(fixture.campaignId);
       const winningArm = evaluation.result.winning_arm_id
         ? arms.find((arm) => arm.id === evaluation.result.winning_arm_id)
@@ -1870,7 +2176,14 @@ export function createAnalyticsFixturePort(options: AnalyticsFixtureOptions = {}
           const weightSum = laneCreatives.reduce((sum, c) => sum + c.weight, 0);
           for (const creative of laneCreatives) {
             cells.push(
-              buildCell(campaign, lane, creative, weightSum > 0 ? creative.weight / weightSum : 0, dayIndex, asOfIndex),
+              buildCell(
+                campaign,
+                lane,
+                creative,
+                weightSum > 0 ? creative.weight / weightSum : 0,
+                dayIndex,
+                asOfIndex,
+              ),
             );
           }
         }

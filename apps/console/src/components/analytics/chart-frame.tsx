@@ -64,7 +64,9 @@ export function ChartFrame({
           {meta}
         </div>
         {descriptionDe ? (
-          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">{descriptionDe}</p>
+          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+            {descriptionDe}
+          </p>
         ) : null}
       </figcaption>
 

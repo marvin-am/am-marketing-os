@@ -93,7 +93,10 @@ describe('MetricGrid', () => {
   it('renders the attribution coverage next to revenue', () => {
     const { container } = render(
       <MetricGrid
-        snapshot={snapshotOf({ spendMinor: 1_000_000, revenueMinor: 4_000_000, closedWon: 3 }, { coverage: 0.42 })}
+        snapshot={snapshotOf(
+          { spendMinor: 1_000_000, revenueMinor: 4_000_000, closedWon: 3 },
+          { coverage: 0.42 },
+        )}
         keys={['revenue', 'roas']}
       />,
     );
@@ -115,7 +118,10 @@ describe('MetricGrid', () => {
   it('shows the data maturity badge on every tile', () => {
     const { container } = render(
       <MetricGrid
-        snapshot={snapshotOf({ spendMinor: 500_000, leads: 40 }, { cohortStartedAt: '2026-08-20T00:00:00.000Z' })}
+        snapshot={snapshotOf(
+          { spendMinor: 500_000, leads: 40 },
+          { cohortStartedAt: '2026-08-20T00:00:00.000Z' },
+        )}
         keys={['cpl', 'revenue']}
       />,
     );

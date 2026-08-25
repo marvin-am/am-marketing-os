@@ -137,7 +137,12 @@ export function FunnelStepChart({
       tableView={tableView}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={bars} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }} barCategoryGap="26%">
+        <BarChart
+          data={bars}
+          layout="vertical"
+          margin={{ top: 4, right: 16, bottom: 4, left: 0 }}
+          barCategoryGap="26%"
+        >
           <CartesianGrid {...GRID_PROPS} vertical horizontal={false} />
           <XAxis
             type="number"
@@ -146,7 +151,10 @@ export function FunnelStepChart({
             tickFormatter={(value: number) => formatAxisValue(value, 'COUNT')}
           />
           <YAxis type="category" dataKey="labelDe" {...AXIS_PROPS} width={190} axisLine={false} />
-          <Tooltip cursor={{ fill: 'var(--viz-grid)', fillOpacity: 0.5 }} content={<VizTooltip rowsFor={rowsFor} />} />
+          <Tooltip
+            cursor={{ fill: 'var(--viz-grid)', fillOpacity: 0.5 }}
+            content={<VizTooltip rowsFor={rowsFor} />}
+          />
           <Bar
             dataKey="completed"
             stackId="sessions"

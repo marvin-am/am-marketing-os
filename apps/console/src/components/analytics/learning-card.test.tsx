@@ -85,9 +85,9 @@ describe('LearningsBrowser', () => {
     await user.click(screen.getByRole('combobox', { name: 'Belegstärke' }));
     await user.click(screen.getByRole('option', { name: CONFIDENCE_LABELS_DE.FACT }));
 
-    expect(
-      screen.getByRole('status').textContent?.replace(/\s+/g, ' '),
-    ).toContain(`${expectedFacts} von ${cards.length} Learnings`);
+    expect(screen.getByRole('status').textContent?.replace(/\s+/g, ' ')).toContain(
+      `${expectedFacts} von ${cards.length} Learnings`,
+    );
   });
 
   it('searches across title, outcome and explanation', async () => {

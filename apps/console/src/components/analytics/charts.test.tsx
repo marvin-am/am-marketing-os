@@ -2,7 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { FunnelStepAnalysis } from '@am/experiments';
 import { computeAllMetrics, emptyCounters, assessMaturity } from '@am/experiments';
-import type { BreakdownRow, DailyPoint, FunnelDropOff, MetricSnapshot } from '@/server/analytics-port';
+import type {
+  BreakdownRow,
+  DailyPoint,
+  FunnelDropOff,
+  MetricSnapshot,
+} from '@/server/analytics-port';
 import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
 import { BreakdownBarChart } from './breakdown-bar-chart';
 import { ChartFrame } from './chart-frame';

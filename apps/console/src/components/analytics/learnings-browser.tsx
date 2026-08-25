@@ -54,8 +54,10 @@ function distinct(values: readonly (string | null)[]): string[] {
 function matches(card: LearningCard, filters: Filters): boolean {
   if (filters.angle !== ALL_FILTER_VALUE && card.angleName !== filters.angle) return false;
   if (filters.offer !== ALL_FILTER_VALUE && card.offerName !== filters.offer) return false;
-  if (filters.funnelKind !== ALL_FILTER_VALUE && card.funnelKind !== filters.funnelKind) return false;
-  if (filters.confidence !== ALL_FILTER_VALUE && card.confidence !== filters.confidence) return false;
+  if (filters.funnelKind !== ALL_FILTER_VALUE && card.funnelKind !== filters.funnelKind)
+    return false;
+  if (filters.confidence !== ALL_FILTER_VALUE && card.confidence !== filters.confidence)
+    return false;
 
   const query = filters.query.trim().toLocaleLowerCase('de-DE');
   if (query.length === 0) return true;
@@ -92,12 +94,14 @@ export function LearningsBrowser({ cards }: LearningsBrowserProps): React.JSX.El
   const angles = React.useMemo(() => distinct(cards.map((card) => card.angleName)), [cards]);
   const offers = React.useMemo(() => distinct(cards.map((card) => card.offerName)), [cards]);
   const funnelKinds = React.useMemo(
-    () =>
-      FUNNEL_KINDS.filter((kind: FunnelKind) => cards.some((card) => card.funnelKind === kind)),
+    () => FUNNEL_KINDS.filter((kind: FunnelKind) => cards.some((card) => card.funnelKind === kind)),
     [cards],
   );
 
-  const visible = React.useMemo(() => cards.filter((card) => matches(card, filters)), [cards, filters]);
+  const visible = React.useMemo(
+    () => cards.filter((card) => matches(card, filters)),
+    [cards, filters],
+  );
   const isFiltered = React.useMemo(
     () =>
       filters.query.trim().length > 0 ||
@@ -127,7 +131,9 @@ export function LearningsBrowser({ cards }: LearningsBrowserProps): React.JSX.El
                 value={filters.query}
                 placeholder="Titel, Ergebnis, Zielgruppe …"
                 className="pl-9"
-                onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, query: event.target.value }))
+                }
               />
             </div>
           </div>
@@ -150,7 +156,10 @@ export function LearningsBrowser({ cards }: LearningsBrowserProps): React.JSX.El
             labelDe="Funnel-Typ"
             value={filters.funnelKind}
             allLabelDe="Alle Funnel-Typen"
-            options={funnelKinds.map((kind) => ({ value: kind, labelDe: FUNNEL_KIND_LABELS_DE[kind] }))}
+            options={funnelKinds.map((kind) => ({
+              value: kind,
+              labelDe: FUNNEL_KIND_LABELS_DE[kind],
+            }))}
             onChange={(value) => setFilters((current) => ({ ...current, funnelKind: value }))}
           />
           <FilterSelect

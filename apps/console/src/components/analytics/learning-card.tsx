@@ -1,9 +1,5 @@
 import * as React from 'react';
-import {
-  ATTRIBUTION_LEVEL_LABELS_DE,
-  CONFIDENCE_LABELS_DE,
-  type LearningCard,
-} from '@am/domain';
+import { ATTRIBUTION_LEVEL_LABELS_DE, CONFIDENCE_LABELS_DE, type LearningCard } from '@am/domain';
 import {
   AttributionCoverageBadge,
   Badge,
@@ -15,7 +11,13 @@ import {
   CONFIDENCE_EXPLANATIONS_DE,
   DataMaturityBadge,
 } from '@am/ui';
-import { formatCurrencyMinor, formatDate, formatNumber, formatPercent, MATURITY_EXPLANATION_DE } from '@/lib/format';
+import {
+  formatCurrencyMinor,
+  formatDate,
+  formatNumber,
+  formatPercent,
+  MATURITY_EXPLANATION_DE,
+} from '@/lib/format';
 import { FUNNEL_KIND_LABELS_DE } from './labels';
 
 export interface LearningCardViewProps {
@@ -25,7 +27,11 @@ export interface LearningCardViewProps {
 function FactLine({ fact }: { fact: LearningCard['outcomeFacts'][number] }): React.JSX.Element {
   const hasBasis = fact.numerator !== null && fact.denominator !== null;
   const display =
-    fact.unit === '%' ? formatPercent(fact.value) : fact.value === null ? '–' : formatNumber(fact.value, 2);
+    fact.unit === '%'
+      ? formatPercent(fact.value)
+      : fact.value === null
+        ? '–'
+        : formatNumber(fact.value, 2);
 
   return (
     <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-border py-1.5 last:border-0">
@@ -44,10 +50,18 @@ function FactLine({ fact }: { fact: LearningCard['outcomeFacts'][number] }): Rea
   );
 }
 
-function Detail({ labelDe, children }: { labelDe: string; children: React.ReactNode }): React.JSX.Element {
+function Detail({
+  labelDe,
+  children,
+}: {
+  labelDe: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{labelDe}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {labelDe}
+      </dt>
       <dd className="text-sm text-foreground">{children}</dd>
     </div>
   );

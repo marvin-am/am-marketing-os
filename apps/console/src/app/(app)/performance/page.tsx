@@ -99,7 +99,8 @@ export default async function PerformancePage({
   );
   const activeCampaign = campaigns.find((campaign) => campaign.id === campaignId);
   const noShows = overview.total.counters.vqScheduled - overview.total.counters.vqAttended;
-  const openOpportunities = overview.total.counters.opportunities - overview.total.counters.closedWon;
+  const openOpportunities =
+    overview.total.counters.opportunities - overview.total.counters.closedWon;
 
   return (
     <div className="flex flex-col gap-8">
@@ -107,14 +108,17 @@ export default async function PerformancePage({
         title="Performance"
         description={
           <>
-            Der vollständige Funnel für {activeCampaign ? activeCampaign.labelDe : 'alle Kampagnen'} vom{' '}
-            {formatDate(range.from)} bis {formatDate(range.to)}. Jede Kennzahl steht mit ihrer
+            Der vollständige Funnel für {activeCampaign ? activeCampaign.labelDe : 'alle Kampagnen'}{' '}
+            vom {formatDate(range.from)} bis {formatDate(range.to)}. Jede Kennzahl steht mit ihrer
             Bezugsgröße, ihrer Datenreife und — wo sie auf Zuordnung beruht — ihrer
             Attributionsabdeckung.
           </>
         }
         toolbar={
           <PerformanceFilters
+            // Remounting on an external URL change (back/forward, a shared
+            // link) keeps the controls in step with what is actually rendered.
+            key={`${selection.presetId}|${range.from}|${range.to}|${campaignId ?? ''}|${funnelVersionId ?? ''}`}
             basePath="/performance"
             presetId={selection.presetId || DEFAULT_PRESET_ID}
             range={range}
@@ -155,10 +159,10 @@ export default async function PerformancePage({
         <CrmDelayNotice statement={overview.crmDelay} snapshot={overview.total} />
         <MetricGrid snapshot={overview.total} keys={BUSINESS_METRICS} columns={3} />
         <p className="text-xs text-muted-foreground">
-          Abgeleitet aus denselben Zählern:{' '}
-          <span data-am-numeric="">{formatNumber(noShows)}</span> No-Shows (terminierte minus
-          stattgefundene VQs) und <span data-am-numeric="">{formatNumber(openOpportunities)}</span>{' '}
-          Opportunities, die noch offen oder verloren sind (Opportunities minus Abschlüsse).
+          Abgeleitet aus denselben Zählern: <span data-am-numeric="">{formatNumber(noShows)}</span>{' '}
+          No-Shows (terminierte minus stattgefundene VQs) und{' '}
+          <span data-am-numeric="">{formatNumber(openOpportunities)}</span> Opportunities, die noch
+          offen oder verloren sind (Opportunities minus Abschlüsse).
         </p>
       </Section>
 

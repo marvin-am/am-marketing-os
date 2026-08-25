@@ -7,7 +7,14 @@ import {
   type ExperimentVerdict,
 } from '@am/domain';
 import { EXPERIMENT_REASON_LABELS_DE, type MaturityAssessment } from '@am/experiments';
-import { Alert, type AlertTone, AlertDescription, AlertTitle, DataMaturityBadge, StatusBadge } from '@am/ui';
+import {
+  Alert,
+  type AlertTone,
+  AlertDescription,
+  AlertTitle,
+  DataMaturityBadge,
+  StatusBadge,
+} from '@am/ui';
 import { CircleCheckBig, CircleDashed } from 'lucide-react';
 import { formatDate, formatDuration, formatNumber, formatPercent } from '@/lib/format';
 import { InterpretationWarnings } from './interpretation-warnings';
@@ -141,7 +148,8 @@ export function thresholdChecks(
     },
     null,
   );
-  const conversionsMet = result.arms.length > 0 && result.arms.every((arm) => arm.meetsMinConversions);
+  const conversionsMet =
+    result.arms.length > 0 && result.arms.every((arm) => arm.meetsMinConversions);
   checks.push({
     id: 'conversions',
     labelDe: 'Conversions je Arm',
@@ -256,9 +264,9 @@ export function ExperimentVerdictPanel({
           {result.verdict === 'PROVISIONAL' ? (
             <>
               <p>
-                <strong>Dies ist kein Gewinner.</strong> Führender Arm:{' '}
-                {winningArmLabelDe ?? '–'}. Bis zur Reife der CRM-Kohorte wird kein Gewinner
-                ausgerufen und nicht auf Basis dieses Ergebnisses skaliert.
+                <strong>Dies ist kein Gewinner.</strong> Führender Arm: {winningArmLabelDe ?? '–'}.
+                Bis zur Reife der CRM-Kohorte wird kein Gewinner ausgerufen und nicht auf Basis
+                dieses Ergebnisses skaliert.
               </p>
               <p>
                 Belastbare Aussagen frühestens am {formatDate(maturity.earliestMatureAt)} — noch{' '}
@@ -304,7 +312,11 @@ export function ExperimentVerdictPanel({
   );
 }
 
-export function ThresholdChecklist({ checks }: { checks: readonly ThresholdCheck[] }): React.JSX.Element {
+export function ThresholdChecklist({
+  checks,
+}: {
+  checks: readonly ThresholdCheck[];
+}): React.JSX.Element {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
