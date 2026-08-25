@@ -1,0 +1,49 @@
+/*
+ * Public funnel runtime stylesheet.
+ *
+ * Shares the brand tokens with the console but stays deliberately lean: this
+ * bundle is on the critical path of a mobile ad click, where LCP is the metric
+ * that decides whether the lead exists at all.
+ */
+@import '@am/ui/styles/theme.css';
+
+@source '../../../../packages/ui/src';
+@source '../';
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--am-background);
+    color: var(--am-foreground);
+    -webkit-font-smoothing: antialiased;
+    /* The funnel never scrolls sideways — a horizontal scrollbar at 320 px is
+       a defect, so the layout is constrained rather than clipped. */
+    overflow-x: hidden;
+  }
+
+  /* iOS zooms any focused control whose font-size is below 16px. Every form
+     control in the funnel therefore starts at 16px on small screens. */
+  @media (max-width: 480px) {
+    input,
+    select,
+    textarea,
+    button {
+      font-size: 16px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
