@@ -1,6 +1,5 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 /**
  * Root Vitest workspace.
@@ -8,14 +7,15 @@ import tsconfigPaths from 'vite-tsconfig-paths';
  * - `unit`        — pure logic, no I/O, runs everywhere (node environment)
  * - `dom`         — React component tests (jsdom)
  * - `integration` — cross-package flows against fixture providers and, when
- *                   `DATABASE_URL` points at a local Supabase test instance,
- *                   against real Postgres + RLS.
+ *                   `DATABASE_URL` points at a Postgres test instance, against
+ *                   real Postgres with RLS. Those suites skip themselves
+ *                   cleanly when the variable is absent.
  */
 export default defineConfig({
   test: {
     projects: [
       {
-        plugins: [tsconfigPaths()],
+        resolve: { tsconfigPaths: true },
         test: {
           name: 'unit',
           environment: 'node',
@@ -25,7 +25,8 @@ export default defineConfig({
         },
       },
       {
-        plugins: [react(), tsconfigPaths()],
+        plugins: [react()],
+        resolve: { tsconfigPaths: true },
         test: {
           name: 'dom',
           environment: 'jsdom',
@@ -36,14 +37,18 @@ export default defineConfig({
         },
       },
       {
-        plugins: [tsconfigPaths()],
+        resolve: { tsconfigPaths: true },
         test: {
           name: 'integration',
           environment: 'node',
           globals: true,
           testTimeout: 30_000,
           hookTimeout: 30_000,
-          include: ['packages/*/integration/**/*.test.ts', 'supabase/tests/**/*.test.ts'],
+          include: [
+            'packages/*/integration/**/*.test.ts',
+            'supabase/tests/**/*.test.ts',
+            'apps/*/integration/**/*.test.ts',
+          ],
           exclude: ['**/node_modules/**', '**/dist/**'],
         },
       },
