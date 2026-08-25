@@ -29,6 +29,64 @@ Each recorded event carries: the business timestamp, the source object, the
 HubSpot object id, the previous and new state, the mapping version, the source
 event id (so a webhook can be replayed) and the attribution snapshot.
 
+### Binding definitions for this portal
+
+The operator reviewed the portal and settled six definitions that a generic
+mapping would get wrong. They are decisions, not defaults, and the wizard must
+not offer an alternative for them.
+
+| Event | What it is **not** | What it is here |
+| --- | --- | --- |
+| `FORM_COMPLETED` | the contact's `createdate`, or an upsert | an accepted Supabase submission, full stop. `createdate` does not fire for a contact that already exists, so a returning lead would silently never complete a form. |
+| `VQ_SCHEDULED` | an entry in HubSpot Meetings | the deal reaching stage `827271`. Meetings is unusable for VQ reporting in this portal. |
+| `OPPORTUNITY_CREATED` | the same thing as `VQ_SCHEDULED` | a successful VQ, i.e. the move on towards sales. Booking a call is not an opportunity. |
+| `VQ_ATTENDED` | a measured fact | **derived** from leaving `827271` other than towards no-show, and labelled `DERIVED` wherever it is shown. A disqualification without a call held would otherwise count as a call held. |
+| `CLOSED_WON` | the deal currently sitting in `756451` | a historical *transition* into won. `756451 – Abgeschlossen` is a pass-through stage, so the present stage cannot answer the question. |
+| `REVENUE_RECOGNIZED` | HubSpot `amount` | not available. `amount` is the **booked contract value** and is named that throughout; recognised revenue needs invoicing data and stays empty until that source exists. |
+
+Two consequences worth stating outright, because they bound what the product may
+claim:
+
+- **Historical campaign-level attribution cannot be reconstructed** from this
+  portal. From go-live, Supabase is the attribution source of truth; anything
+  before it is a gap, and the reports must show it as one rather than
+  interpolating.
+- **The revenue dashboard shows booked contract value only.** "Bezahlter Umsatz"
+  stays empty until an invoicing source is connected. It is never estimated from
+  the booked figure.
+
+### Ownership of a lead's history
+
+| Touch | Mutability | Where |
+| --- | --- | --- |
+| First touch | immutable | Supabase |
+| Last touch | updated | Supabase |
+| Acquisition touch | immutable, per submission and per opportunity | Supabase |
+
+HubSpot receives a **thin mirror**, never the archive: the contact carries the
+most recent enquiry, the deal carries its opportunity's acquisition snapshot.
+Qualification answers stay in Supabase in full; HubSpot gets the score, the
+outcome, the leading reason codes and a link back to the submission. Copying raw
+answers into CRM properties would duplicate personal data into a second system
+with a different retention policy for no analytical gain.
+
+Repeated scheduling does not re-count: a lead with a second VQ appointment does
+not increment "Leads mit VQ-Termin" again. Additional appointments are counted
+separately, so rescheduling shows up as rescheduling rather than as demand.
+
+### What this product does not do to the portal
+
+Deal creation stays with the existing `VQ – Deal erstellen` workflow. The
+marketing OS observes it and binds the resulting deal to its acquisition
+submission; it does not create a parallel deal of its own. Two systems creating
+deals against one pipeline produces duplicates that no reconciliation can
+untangle afterwards.
+
+Funnels built in this product write to Supabase first and reach HubSpot through
+this outbox — never additionally through Zapier or n8n. Those existing flows
+overwrite properties, so any migration has to draw a clear boundary around which
+system owns which property before a funnel is moved across.
+
 ## The wizard
 
 Fifteen steps, each persisted so the wizard can be resumed:

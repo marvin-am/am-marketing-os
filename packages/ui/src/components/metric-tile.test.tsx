@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { rate, type MetricValue } from '@am/domain';
+import { METRIC_CATALOG, METRIC_KEYS, rate, type MetricValue } from '@am/domain';
 import { MetricTile } from './metric-tile';
 
 function valueOf(container: HTMLElement): string {
@@ -32,6 +32,33 @@ describe('MetricTile', () => {
     expect(valueOf(container)).not.toContain('0');
     // The basis is still rendered so the dash is explainable.
     expect(basisOf(container)).toContain('0 / 0');
+  });
+
+  it('marks a derived metric as derived, right next to the number', () => {
+    /* The CRM records no "the call happened" event, so attendance is inferred
+       from a deal leaving the scheduled stage. A show rate rendered exactly
+       like a measured number is an estimate someone will steer a budget on. */
+    const { container } = render(<MetricTile metric="show_rate" value={rate(31, 44)} maturity="MATURE" />);
+
+    expect(container.querySelector('[data-am-derived]')).toBeInTheDocument();
+    expect(screen.getByText('Abgeleitet')).toBeInTheDocument();
+  });
+
+  it('does not mark a measured metric', () => {
+    const { container } = render(<MetricTile metric="leads" value={rate(31, 44)} maturity="MATURE" />);
+
+    expect(container.querySelector('[data-am-derived]')).not.toBeInTheDocument();
+  });
+
+  it('marks every metric the catalogue calls derived, and only those', () => {
+    // Asserted over the whole catalogue rather than one example, so a metric
+    // added later cannot introduce an unmarked estimate.
+    for (const key of METRIC_KEYS) {
+      const { container, unmount } = render(<MetricTile metric={key} value={rate(1, 2)} maturity="MATURE" />);
+      const marked = container.querySelector('[data-am-derived]') !== null;
+      expect(marked, key).toBe(METRIC_CATALOG[key].measurement === 'DERIVED');
+      unmount();
+    }
   });
 
   it('renders the data maturity badge beside the label', () => {

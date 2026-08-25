@@ -3,6 +3,7 @@
 import * as React from 'react';
 import {
   METRIC_CATALOG,
+  METRIC_MEASUREMENT_LABELS_DE,
   type DataMaturity,
   type MetricDirection,
   type MetricKey,
@@ -166,6 +167,18 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(func
           <InfoHint label={`Erklärung zu ${resolvedLabel}`}>
             {hint ?? `Berechnung: ${definition?.formula}`}
           </InfoHint>
+        ) : null}
+        {definition?.measurement === 'DERIVED' ? (
+          /* An estimate rendered identically to an observation invites a
+             decision it cannot carry, so the marker sits on the number itself
+             rather than in a footnote someone has to go looking for. */
+          <span
+            data-am-derived=""
+            title="Diese Kennzahl ist abgeleitet, nicht gemessen."
+            className="rounded-sm border border-border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {METRIC_MEASUREMENT_LABELS_DE.DERIVED}
+          </span>
         ) : null}
         {resolvedMaturity ? (
           <DataMaturityBadge maturity={resolvedMaturity} withHint={false} className="ml-auto" />
