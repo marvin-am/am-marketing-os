@@ -55,7 +55,7 @@ const IDENTITY = {
 
 function leadInput() {
   return {
-    submissionId: SUBMISSION_ID,
+    submissionAttemptId: SUBMISSION_ID,
     pixelId: FIXTURE_PIXEL_ID,
     occurredAt: '2026-06-29T09:30:00.000Z',
     eventSourceUrl: 'https://funnel.am-beratung.de/potenzialanalyse?am_t=signed-token',

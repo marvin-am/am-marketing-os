@@ -395,7 +395,12 @@ export function assertNoSensitiveCustomData(customData: CapiCustomData | undefin
 /* -------------------------------------------------------------------------- */
 
 export interface InitialLeadInput {
-  submissionId: string;
+  /**
+   * Seed for the shared pixel/CAPI event id. The submission *attempt* id — see
+   * `initialLeadEventIdSource`; a stored row id is minted too late and changes
+   * on a retry.
+   */
+  submissionAttemptId: string;
   pixelId: string;
   /** Business time of the submission. Never the dispatch or retry time. */
   occurredAt: string;
@@ -424,8 +429,8 @@ export interface InitialLeadEventPair {
  * hashed so no internal uuid leaves the system, and so it has the same shape as
  * every down-funnel id.
  */
-export async function initialLeadEventId(submissionId: string): Promise<string> {
-  return sha256Hex(initialLeadEventIdSource(submissionId));
+export async function initialLeadEventId(submissionAttemptId: string): Promise<string> {
+  return sha256Hex(initialLeadEventIdSource(submissionAttemptId));
 }
 
 /**
@@ -436,7 +441,7 @@ export async function initialLeadEventId(submissionId: string): Promise<string> 
 export async function buildInitialLeadEvent(
   input: InitialLeadInput,
 ): Promise<InitialLeadEventPair> {
-  const eventId = await initialLeadEventId(input.submissionId);
+  const eventId = await initialLeadEventId(input.submissionAttemptId);
   const eventName = input.eventName ?? CAPI_STAGE_EVENT_NAMES.INITIAL_LEAD;
   const actionSource = input.actionSource ?? 'website';
 

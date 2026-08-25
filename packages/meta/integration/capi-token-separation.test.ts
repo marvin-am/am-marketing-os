@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SAFE_DEFAULT_FLAGS } from '@am/domain';
 import { LiveMetaProvider } from '../src/live-provider';
+import type { CapiDispatchRequest } from '../src/provider';
 
 /**
  * The Conversions API is normally granted its own token — a system user scoped
@@ -86,14 +87,25 @@ async function expectedProof(token: string): Promise<string> {
     .join('');
 }
 
-const dispatch = { destinationId: '1048497165333604', events: [{ event_name: 'Lead' }] };
+const dispatch: CapiDispatchRequest = {
+  destinationId: '1048497165333604',
+  events: [
+    {
+      event_name: 'Lead',
+      event_time: Math.floor(Date.parse('2026-08-25T10:00:00.000Z') / 1000),
+      action_source: 'website',
+      user_data: {},
+    },
+  ],
+};
 
 describe('Conversions API token separation', () => {
   it('sends the CAPI token, not the Marketing API one', async () => {
     const { provider, calls } = providerWith(CAPI_TOKEN);
     const outcome = await provider.sendCapiEvents(dispatch);
 
-    expect(outcome.ok).toBe(true);
+    /* A dry run is also a `MutationOutcome`, so narrow before reading `ok`. */
+    expect('dryRun' in outcome).toBe(false);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.authorization).toBe(`Bearer ${CAPI_TOKEN}`);
     expect(calls[0]?.authorization).not.toContain(MARKETING_TOKEN);

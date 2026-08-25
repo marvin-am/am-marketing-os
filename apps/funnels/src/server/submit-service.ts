@@ -206,9 +206,15 @@ export function leadIdentityFrom(
   };
 }
 
-/** Deterministic HubSpot dispatch id: a replay collapses onto one sync. */
-export async function hubspotOutboxEventId(submissionId: string): Promise<string> {
-  return sha256Hex(`hubspot:lead:${submissionId}`);
+/**
+ * Deterministic HubSpot dispatch id: a replay collapses onto one sync.
+ *
+ * Seeded from the submission *attempt*, for the same reason the Meta pair is —
+ * the stored row id is minted by the database and differs on a retry that
+ * resolves onto the original submission.
+ */
+export async function hubspotOutboxEventId(submissionAttemptId: string): Promise<string> {
+  return sha256Hex(`hubspot:lead:${submissionAttemptId}`);
 }
 
 /**
@@ -217,7 +223,7 @@ export async function hubspotOutboxEventId(submissionId: string): Promise<string
  * admitted gap (AGENTS.md rule 1).
  */
 async function buildLeadPair(
-  submissionId: string,
+  submissionAttemptId: string,
   pixelId: string | null,
   occurredAt: string,
   eventSourceUrl: string,
@@ -226,7 +232,7 @@ async function buildLeadPair(
 ): Promise<InitialLeadEventPair | null> {
   if (!pixelId) return null;
   return buildInitialLeadEvent({
-    submissionId,
+    submissionAttemptId,
     pixelId,
     occurredAt,
     eventSourceUrl,
@@ -364,20 +370,22 @@ export async function submitLead(
     clientUserAgent: context.userAgent,
   });
 
-  /* One event id for the browser pixel and the server event. It is derived from
-     the submission, which exists exactly once per accepted lead, so a retry, a
+  /* One event id for the browser pixel and the server event, derived from the
+     submission attempt — the thing that exists exactly once per lead and is the
+     same value before the write, after it, and on every retry. So a retry, a
      replay and the pixel all collapse onto the same Meta event. */
   const leadPair = await buildLeadPair(
-    submissionId,
+    request.submissionAttemptId,
     pixelId,
     occurredAt,
     context.eventSourceUrl,
     identity,
     adMeasurementAllowed,
   );
-  const leadEventId = leadPair?.eventId ?? (await sha256Hex(`lead:${submissionId}`));
+  const leadEventId =
+    leadPair?.eventId ?? (await sha256Hex(`lead:${request.submissionAttemptId}`));
 
-  const hubspotEventId = await hubspotOutboxEventId(submissionId);
+  const hubspotEventId = await hubspotOutboxEventId(request.submissionAttemptId);
   const hubspotPayloadHash = await sha256Hex(
     JSON.stringify({
       submission_id: submissionId,
@@ -478,20 +486,18 @@ export async function submitLead(
   }
 
   /* ---- 7. the browser pixel, sharing the server event's id ----------- */
-  let pixel: PixelPayload | null = adMeasurementAllowed ? (leadPair?.pixel ?? null) : null;
-  if (pixel && accepted.submissionId !== submissionId) {
-    /* A duplicate attempt resolves to the original submission, so the pixel has
-       to carry that submission's event id or the pair would stop deduplicating. */
-    const replay = await buildLeadPair(
-      accepted.submissionId,
-      pixelId,
-      occurredAt,
-      context.eventSourceUrl,
-      identity,
-      adMeasurementAllowed,
-    );
-    pixel = replay?.pixel ?? null;
-  }
+  /*
+   * No rebuild. Both ids are seeded from the submission attempt, which is
+   * settled before the write and identical for every retry of it, so the pixel
+   * and the queued server event already carry the same id.
+   *
+   * They previously came from a locally generated submission id, and the store
+   * returns the row id the database minted — so on the Postgres path the two
+   * always differed, the rebuild always fired, and the queued CAPI row was left
+   * holding the pre-transaction id. Nothing fails when that happens: Meta
+   * simply stops recognising the pair and counts every lead twice.
+   */
+  const pixel: PixelPayload | null = adMeasurementAllowed ? (leadPair?.pixel ?? null) : null;
 
   const redirect =
     variant?.kind === 'REDIRECT'

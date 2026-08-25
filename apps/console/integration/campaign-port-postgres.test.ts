@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { announceSkip, HAS_DATABASE, setupDatabase, type Harness } from '../../../supabase/tests/harness';
 import { createDatabaseCampaignPort } from '@/server/campaign-db-port';
 import type { CampaignPort } from '@/server/campaign-port';
+import { CONSOLE_WORKSPACE_ID } from '@/server/workspace';
 import {
   actAs,
   assetsHashOfCampaignA,
@@ -107,6 +108,31 @@ describe.skipIf(!HAS_DATABASE)('DatabaseCampaignPort against Postgres', () => {
       });
       expect(page.rows.map((row) => row.id)).toEqual([CAMPAIGN_A]);
       expect(page.facets.angles).toEqual([ANGLE_NAME]);
+    });
+
+    it('finds the workspace by its slug rather than trusting the id it was handed', async () => {
+      // `CONSOLE_WORKSPACE_ID` is not the id this scratch database was seeded
+      // with. A port that used it verbatim would render an empty list with
+      // nothing on the page to explain why.
+      const session = await actAs(open, PROFILE_LEAD);
+      sessions.push(session);
+      const misconfigured = createDatabaseCampaignPort({
+        database: async () => session.db,
+        workspaceId: CONSOLE_WORKSPACE_ID,
+        transaction: session.transaction,
+        now: () => NOW,
+      });
+      const page = await misconfigured.listCampaigns({
+        states: [],
+        angles: [],
+        offers: [],
+        from: null,
+        to: null,
+        search: null,
+        page: 1,
+        pageSize: 25,
+      });
+      expect(page.rows.map((row) => row.id)).toEqual([CAMPAIGN_A]);
     });
 
     it('reads the creative board from `creative_concepts`, approved set included', async () => {

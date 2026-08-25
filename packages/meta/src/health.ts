@@ -508,7 +508,7 @@ export async function probeCapiTest(
 
   try {
     const pair = await buildInitialLeadEvent({
-      submissionId: '00000000-0000-4000-8000-000000000000',
+      submissionAttemptId: '00000000-0000-4000-8000-000000000000',
       pixelId: destination,
       occurredAt: now,
       eventSourceUrl: 'https://example.de/health-check',

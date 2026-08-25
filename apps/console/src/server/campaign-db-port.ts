@@ -65,6 +65,7 @@ import {
   testPlanContentHash,
 } from './campaign-content-hash';
 import { campaignTabHref } from './campaign-port';
+import { workspaceResolver } from './workspace';
 import type {
   ApprovalDecisionInput,
   ApprovalStatus,
@@ -117,10 +118,10 @@ import type { TransactionRunner } from './campaign-transaction';
  * 1. **It never fills a gap with a plausible number.** Several fields the
  *    Campaign Room shows have no column and no repository behind them yet —
  *    claims, creative preview URLs, the display name behind an approver id. Each
- *    of those comes back empty or `null` with a German sentence saying so, and
- *    every one of them is listed in the integration report. A screen that says
- *    "nichts hinterlegt" is recoverable; a screen showing an invented figure is
- *    not.
+ *    of those comes back empty or `null`, and the comment at the site says which
+ *    table would have to be reachable for it to carry a value. A screen that
+ *    says "nichts hinterlegt" is recoverable; a screen showing an invented
+ *    figure is not.
  * 2. **A local click is never a provider confirmation.** Every write that would
  *    reach Meta or HubSpot goes through the same gate as in the fixture: a
  *    `DryRunResult` while `EXTERNAL_WRITES_ENABLED` is off, and a refusal —
@@ -144,6 +145,7 @@ export interface CampaignDatabaseOptions {
    * operator's RLS context happened to build it.
    */
   database: () => Promise<AmDatabase>;
+  /** Fallback workspace while no workspace row carries the console's slug. */
   workspaceId: string;
   /** Atomic writes. `null` when no `DATABASE_URL` is configured. */
   transaction: TransactionRunner | null;
@@ -343,8 +345,20 @@ export class DatabaseCampaignPort implements CampaignPort {
     return this.options.now ? this.options.now() : new Date();
   }
 
-  private workspaceId(): Uuid {
-    return asUuid(this.options.workspaceId);
+  /**
+   * The workspace the list reads.
+   *
+   * Resolved from the slug through `workspaceResolver` rather than taken from
+   * the option, because a pinned uuid that does not match the row in the
+   * database fails in the worst possible way: every query succeeds, every screen
+   * renders, and every list is empty with nothing on the page to say why. Cached
+   * on the instance — the id belongs to the deployment, not to the request.
+   */
+  private workspaceIdPromise: Promise<Uuid> | null = null;
+
+  private workspaceId(db: AmDatabase): Promise<Uuid> {
+    this.workspaceIdPromise ??= workspaceResolver(db, this.options.workspaceId)();
+    return this.workspaceIdPromise;
   }
 
   private db(): Promise<AmDatabase> {
@@ -1180,7 +1194,7 @@ export class DatabaseCampaignPort implements CampaignPort {
 
   async listCampaigns(query: CampaignListQuery): Promise<CampaignListPage> {
     const db = await this.db();
-    const workspaceId = this.workspaceId();
+    const workspaceId = await this.workspaceId(db);
     const page = await db.campaigns.list({
       workspaceId,
       states: query.states.length > 0 ? query.states : undefined,

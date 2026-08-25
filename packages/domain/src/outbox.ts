@@ -94,11 +94,19 @@ export function capiEventIdSource(
 
 /**
  * The initial website lead uses one shared id across browser pixel and server
- * CAPI so Meta can deduplicate the pair (spec §23). It is derived from the
- * submission, which exists exactly once per accepted lead.
+ * CAPI so Meta can deduplicate the pair (spec §23).
+ *
+ * The seed is the **submission attempt**, not the stored row. An attempt is one
+ * visitor pressing submit once — which is the conversion Meta is being told
+ * about — and it is known before the write, unchanged after it, and identical
+ * across every retry of that attempt. A row id is none of those: the database
+ * mints it, so it is not available when the pixel payload is built, and a
+ * retried attempt resolving onto the original row would change it. That
+ * mismatch does not fail; it silently sends the pixel and the server event
+ * under different ids and Meta counts the lead twice.
  */
-export function initialLeadEventIdSource(submissionId: string): string {
-  return `lead:${submissionId}`;
+export function initialLeadEventIdSource(submissionAttemptId: string): string {
+  return `lead:${submissionAttemptId}`;
 }
 
 export const OUTBOX_STATE_LABELS_DE: Readonly<Record<z.infer<typeof outboxStateSchema>, string>> = {

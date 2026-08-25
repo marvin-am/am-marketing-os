@@ -525,6 +525,84 @@ describe.skipIf(!HAS_DATABASE)('funnel store against Postgres', () => {
     singleton.current = null;
   });
 
+  it('sends the pixel and the queued server event under one id', async () => {
+    /*
+     * The pair Meta deduplicates on, asserted here rather than against the
+     * fixture because only a real database exposes the defect: the RPC mints
+     * its own submission id, so an id seeded from the locally generated one
+     * always diverged from what the store returned. The pixel was then rebuilt
+     * with the stored id while the CAPI row already queued kept the original.
+     *
+     * Nothing fails when that happens. Meta simply stops recognising the two as
+     * one conversion and counts every lead twice — which is invisible until
+     * someone compares the ad account against the CRM.
+     */
+    const store = await openStore();
+    singleton.current = store;
+    resetPublishedCache();
+
+    const ids = newVisitor();
+    await store.recordTouch(touchFor(postgresWorld, ids));
+    const instance = await store.createFormInstance({
+      visitorId: ids.visitorId,
+      sessionId: ids.sessionId,
+      funnelId: FUNNEL,
+      funnelVersionId: FUNNEL_VERSION,
+      formId: SPEC.formId,
+      formVersionId: SPEC.formVersionId,
+      environment: 'test',
+      trafficKind: 'PRODUCTION',
+      experimentId: null,
+      experimentArmId: null,
+      startedAt: new Date().toISOString(),
+      touch: null,
+    });
+
+    const attemptId = newId();
+    const request = {
+      funnelVersionId: FUNNEL_VERSION,
+      formVersionId: SPEC.formVersionId,
+      formInstanceId: instance.formInstanceId,
+      submissionAttemptId: attemptId,
+      answers: sampleAnswers(SPEC),
+      elapsedSeconds: 120,
+      stepsVisited: SPEC.steps.length,
+    };
+    const context = {
+      visitorId: ids.visitorId,
+      sessionId: ids.sessionId,
+      environment: 'test' as const,
+      trafficKind: 'PRODUCTION' as const,
+      originOk: true,
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
+      clientIpAddress: null,
+      eventSourceUrl: postgresWorld.landingUrl,
+    };
+
+    const outcome = await submitLead(request, context, {
+      store,
+      pixelId: '1048497165333604',
+    });
+    const body = outcome.body as {
+      ok: true;
+      submissionId: string;
+      pixel: { eventID: string } | null;
+    };
+
+    /* The premise: the database really did mint its own id. Without this the
+       assertion below could pass for the wrong reason. */
+    expect(body.submissionId).not.toBe(attemptId);
+    expect(body.pixel?.eventID).toBeTruthy();
+
+    const queued = await store.listOutboxForSubmission(body.submissionId);
+    const capi = queued.find((row) => row.destination === 'META_CAPI');
+    expect(capi).toBeDefined();
+    expect(body.pixel?.eventID).toBe(capi?.event_id);
+
+    singleton.current = null;
+  });
+
   describe('no personal data reaches events', () => {
     it('is refused by the collector before anything is stored', async () => {
       const store = await openStore();

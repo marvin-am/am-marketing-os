@@ -56,6 +56,7 @@ import {
   type TestPlanContent,
 } from './campaign-content-hash';
 import { createPgTransactionRunner } from './campaign-transaction';
+import { CONSOLE_WORKSPACE_ID } from './workspace';
 import type {
   ApprovalDecisionInput,
   ApprovalStatus,
@@ -2681,7 +2682,7 @@ export function getCampaignPort(): CampaignPort {
 
   port = createDatabaseCampaignPort({
     database: campaignDatabase,
-    workspaceId: WORKSPACE_ID,
+    workspaceId: CONSOLE_WORKSPACE_ID,
     // Without a DATABASE_URL the multi-row writes have no way to be atomic, and
     // the port refuses them rather than performing half of one.
     transaction: createPgTransactionRunner(),

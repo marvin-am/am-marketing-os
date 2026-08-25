@@ -102,7 +102,27 @@ describe('idempotency', () => {
     expect(getFixtureStore().snapshot().submissions).toHaveLength(1);
   });
 
-  it('keeps the browser pixel on the stored submission id across a retry', async () => {
+  it('sends the pixel and the queued server event under one id', async () => {
+    /*
+     * This is the pair Meta deduplicates on, and getting it wrong does not
+     * fail — it silently counts every lead twice.
+     *
+     * Both ids used to be seeded from a locally generated submission id while
+     * the store returns the id the database minted. On the fixture store those
+     * agree; on Postgres they never do, so the pixel was rebuilt with the
+     * stored id while the already-queued CAPI row kept the original. Seeding
+     * both from the submission attempt removes the divergence rather than
+     * patching one side of it.
+     */
+    const body = expectSuccess(await submitLead(request(), context(), deps()));
+    const outbox = await getFixtureStore().listOutboxForSubmission(body.submissionId);
+    const capi = outbox.find((row) => row.destination === 'META_CAPI');
+
+    expect(capi).toBeDefined();
+    expect(body.pixel?.eventID).toBe(capi?.event_id);
+  });
+
+  it('keeps the browser pixel on the same id across a retry', async () => {
     const first = expectSuccess(await submitLead(request(), context(), deps()));
     const retry = expectSuccess(await submitLead(request(), context(), deps()));
 

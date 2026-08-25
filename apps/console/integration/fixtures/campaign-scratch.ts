@@ -118,9 +118,11 @@ const COPY = {
  * `authenticated`, so the rows exist regardless of the policies under test.
  */
 export async function seedCampaignScratch(admin: PgConnectionLike): Promise<void> {
+  // Workspace A carries the console's own slug, so the port resolves it the way
+  // it would in production instead of being handed the right id by the test.
   await admin.query(
     `insert into public.workspaces (id, slug, name) values
-       ($1, 'am-a', 'A&M Workspace A'),
+       ($1, 'am', 'A&M Workspace A'),
        ($2, 'am-b', 'A&M Workspace B')`,
     [WORKSPACE_A, WORKSPACE_B],
   );

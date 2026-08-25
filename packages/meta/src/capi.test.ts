@@ -38,7 +38,7 @@ const FORM_INSTANCE_ID = 'a1b2c3d4-0000-4000-8000-000000000001';
 
 function leadInput(overrides: Record<string, unknown> = {}) {
   return {
-    submissionId: SUBMISSION_ID,
+    submissionAttemptId: SUBMISSION_ID,
     pixelId: '1180347629945512',
     occurredAt: NOW,
     eventSourceUrl: 'https://funnel.am-beratung.de/potenzialanalyse?am_t=abc&utm_source=meta',
