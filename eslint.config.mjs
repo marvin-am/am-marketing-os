@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import next from '@next/eslint-plugin-next';
 
 export default tseslint.config(
   {
@@ -71,6 +72,18 @@ export default tseslint.config(
       ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'smart'],
+    },
+  },
+  {
+    // Next's own rules catch things generic linting cannot: an unoptimised
+    // <img> on the funnel runtime is a real LCP regression, and a synchronous
+    // script tag in the head blocks first paint on the page a mobile ad click
+    // lands on.
+    files: ['apps/*/src/**/*.{ts,tsx}'],
+    plugins: { '@next/next': next },
+    rules: {
+      ...next.configs.recommended.rules,
+      ...next.configs['core-web-vitals'].rules,
     },
   },
   {
