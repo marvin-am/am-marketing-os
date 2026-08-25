@@ -109,15 +109,24 @@ function lit(value) {
  *
  * Columns that are null in every row are dropped: the database default applies
  * anyway, and a wall of `null, null, null` makes the emitted SQL unreadable.
+ *
+ * Every statement ends `on conflict do nothing`, because `pnpm db:seed` is
+ * documented as safe to re-run. Without it a second run aborts on the first
+ * duplicate key and leaves the operator guessing whether anything was written.
+ * The seed uses fixed UUIDs, so a re-run is genuinely a no-op rather than a
+ * partial overwrite.
  */
-function insert(table, columns, rows, { chunkSize = 200 } = {}) {
+function insert(table, columns, rows, { chunkSize = 200, conflictTarget = null } = {}) {
   if (rows.length === 0) return;
   const used = columns.filter((c) => rows.some((row) => row[c] !== null && row[c] !== undefined));
   if (used.length === 0) return;
+  const onConflict = conflictTarget
+    ? ` on conflict (${conflictTarget}) do nothing`
+    : ' on conflict do nothing';
   for (let i = 0; i < rows.length; i += chunkSize) {
     const slice = rows.slice(i, i + chunkSize);
     say(`insert into public.${table} (${used.join(', ')}) values`);
-    say(slice.map((row) => `  (${used.map((c) => lit(row[c])).join(',')})`).join(',\n') + ';');
+    say(slice.map((row) => `  (${used.map((c) => lit(row[c])).join(',')})`).join(',\n') + onConflict + ';');
     say();
   }
 }
