@@ -73,7 +73,8 @@ export interface CollectorContext {
   /** In-process idempotency guard; the database unique index is the real one. */
   dedupe?: EventDedupeStore;
   limiter?: RateLimiter;
-  rateLimitKey?: string;
+  /** Buckets this batch is charged to, coarsest first — see `rateLimitKeysFor`. */
+  rateLimitKeys?: readonly string[];
   maxBatchSize?: number;
 }
 
@@ -218,7 +219,16 @@ export function createMemoryRateLimitStore(maxKeys = 10_000): RateLimitStore {
   return {
     read: (key) => buckets.get(key),
     write: (key, state) => {
-      if (!buckets.has(key) && buckets.size >= maxKeys) {
+      /*
+       * Re-inserting moves the key to the end of the Map's iteration order, so
+       * the entry dropped when the store is full is the one that has gone
+       * longest without being charged. Evicting by first insertion instead would
+       * discard the busiest bucket first — and the busiest bucket is exactly the
+       * one a flood of single-request keys must not be able to clear, because
+       * clearing it hands the flood a full budget again.
+       */
+      buckets.delete(key);
+      if (buckets.size >= maxKeys) {
         const oldest = buckets.keys().next();
         if (!oldest.done) buckets.delete(oldest.value);
       }
@@ -310,14 +320,78 @@ export function hashIdentifier(value: string, salt = ''): string {
   return createHash('sha256').update(`${salt}:${value}`, 'utf8').digest('hex').slice(0, 32);
 }
 
-export function rateLimitKeyFor(input: {
+/**
+ * The bucket a request falls into when its client address cannot be read. One
+ * shared bucket rather than none: a proxy that stops forwarding the address has
+ * to degrade the limit, never remove it.
+ */
+export const SHARED_RATE_LIMIT_KEY = 'i:unknown';
+
+export interface RateLimitKeyInput {
+  /** The visitor id this request will be recorded under. */
   visitorId?: string | null;
+  /**
+   * True only when `visitorId` arrived in a cookie this server had previously
+   * set. An id minted for this very request is not evidence of anything — the
+   * caller obtained it by sending no cookie at all.
+   */
+  visitorPresented?: boolean;
+  /** Client address. Hashed before it reaches the key; never stored raw. */
   ipAddress?: string | null;
   salt?: string;
-}): string {
-  if (input.visitorId) return `v:${hashIdentifier(input.visitorId, input.salt)}`;
-  if (input.ipAddress) return `i:${hashIdentifier(input.ipAddress, input.salt)}`;
-  return 'anon';
+}
+
+/**
+ * The buckets a request has to pass, coarsest first.
+ *
+ * The address bucket is what actually bounds an anonymous caller, because the
+ * address is the only part of the key the caller does not choose. A key built
+ * from the visitor id alone hands a fresh, full budget to anyone who drops or
+ * rotates `am_vid` — and since the server mints a visitor id for every
+ * cookie-less request, that is one budget per request, which is no limit at all.
+ *
+ * A visitor id the browser presented earns a second, narrower bucket on top of
+ * the address bucket, so a cookie can refine a budget but never grant one. A
+ * minted id gets no bucket of its own: it is random per request, so its bucket
+ * would arrive full every time and account for nothing while churning the store.
+ *
+ * Both keys are charged from the same limiter, which makes the address bucket
+ * the binding one; the visitor bucket is where a per-browser budget attaches
+ * once the two limits differ.
+ */
+export function rateLimitKeysFor(input: RateLimitKeyInput): readonly string[] {
+  const address = input.ipAddress
+    ? `i:${hashIdentifier(input.ipAddress, input.salt)}`
+    : SHARED_RATE_LIMIT_KEY;
+  if (!input.visitorId || input.visitorPresented !== true) return [address];
+  return [address, `v:${hashIdentifier(input.visitorId, input.salt)}|${address}`];
+}
+
+/**
+ * Charges every bucket a request belongs to and stops at the first refusal.
+ *
+ * Stopping matters: a caller already over the budget of the address it is
+ * calling from must not also be able to drain the narrower bucket of a visitor
+ * whose cookie it is replaying.
+ */
+export function takeAll(
+  limiter: RateLimiter,
+  keys: readonly string[],
+  cost = 1,
+  nowMs?: number,
+): RateLimitDecision {
+  const charged = keys.length > 0 ? keys : [SHARED_RATE_LIMIT_KEY];
+  let decision: RateLimitDecision = {
+    allowed: true,
+    remaining: limiter.capacity,
+    retryAfterSeconds: 0,
+    limit: limiter.capacity,
+  };
+  for (const key of charged) {
+    decision = limiter.take(key, cost, nowMs);
+    if (!decision.allowed) break;
+  }
+  return decision;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -383,7 +457,7 @@ export function ingestBatch(
     }
 
     if (ctx.limiter) {
-      const decision = ctx.limiter.take(ctx.rateLimitKey ?? 'anon');
+      const decision = takeAll(ctx.limiter, ctx.rateLimitKeys ?? []);
       if (!decision.allowed) {
         rejected.push(
           toRejection(

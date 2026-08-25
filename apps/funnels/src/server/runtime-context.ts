@@ -46,6 +46,11 @@ export interface RuntimeContextInput {
   secFetchSite: string | null;
   /** True for `/preview/...`, which is never production traffic. */
   isPreviewRoute?: boolean;
+  /**
+   * True when the edge minted the visitor id it is forwarding in the cookie
+   * header. Only the edge can tell — see `MINTED_VISITOR_HEADER`.
+   */
+  visitorMintedAtEdge?: boolean;
   now?: Date;
   /** Test seam for cookie issuing. */
   generateId?: () => string;
@@ -54,6 +59,14 @@ export interface RuntimeContextInput {
 export interface RuntimeContext {
   visitor: ResolvedVisitor;
   visitorId: string;
+  /**
+   * True when `visitorId` came out of a cookie the browser sent, false when it
+   * was minted for this request — here or at the edge, which forwards what it
+   * minted in the cookie header. Weak evidence, since the cookie is unsigned,
+   * but it is the difference between a browser we have seen before and a caller
+   * that sent nothing, and only the former may select a bucket of its own.
+   */
+  visitorPresented: boolean;
   sessionId: string;
   trafficKind: TrafficKind;
   environment: AppEnvironment;
@@ -130,6 +143,7 @@ export function resolveRuntimeContext(input: RuntimeContextInput): RuntimeContex
   return {
     visitor,
     visitorId: visitor.visitorId,
+    visitorPresented: !visitor.isNew && input.visitorMintedAtEdge !== true,
     sessionId: visitor.sessionId,
     trafficKind,
     environment: getAppConfig().environment,

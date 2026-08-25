@@ -4,6 +4,7 @@ import { EVENT_SCHEMA_VERSION } from '@am/domain';
 import {
   createExposureRegistry,
   createMemoryDedupeStore,
+  createMemoryRateLimitStore,
   createRateLimiter,
   deriveAbandonedForms,
   deterministicUuid,
@@ -11,8 +12,9 @@ import {
   hashIdentifier,
   ingestBatch,
   normalizeEvent,
-  rateLimitKeyFor,
+  rateLimitKeysFor,
   shouldRecordExposure,
+  takeAll,
   type CollectorContext,
   type FormInstanceActivity,
 } from './collector';
@@ -191,18 +193,34 @@ describe('ingestBatch', () => {
 
   it('rate-limits by hashed key', () => {
     const limiter = createRateLimiter({ capacity: 3, refillPerSecond: 1 });
-    const key = rateLimitKeyFor({ ipAddress: '203.0.113.7', salt: 'pepper' });
-    expect(key.startsWith('i:')).toBe(true);
-    expect(key).not.toContain('203.0.113.7');
+    const keys = rateLimitKeysFor({ ipAddress: '203.0.113.7', salt: 'pepper' });
+    expect(keys[0]?.startsWith('i:')).toBe(true);
+    expect(keys.join('|')).not.toContain('203.0.113.7');
 
     const result = ingestBatch(
       [baseEvent(), baseEvent(), baseEvent(), baseEvent(), baseEvent()],
-      { ...ctx, limiter, rateLimitKey: key },
+      { ...ctx, limiter, rateLimitKeys: keys },
     );
 
     expect(result.accepted).toHaveLength(3);
     expect(result.rejected).toHaveLength(2);
     expect(result.rejected[0]?.code).toBe('RATE_LIMITED');
+  });
+
+  it('charges the address bucket even when the caller brings no visitor id', () => {
+    /* Identity is not a precondition for being accounted: a batch that names no
+       visitor is charged to the address it arrived from, which is the only
+       thing about it left to charge. */
+    const limiter = createRateLimiter({ capacity: 2, refillPerSecond: 0 });
+    const flood = () =>
+      ingestBatch([baseEvent(), baseEvent(), baseEvent()], {
+        ...ctx,
+        limiter,
+        rateLimitKeys: rateLimitKeysFor({ ipAddress: '203.0.113.7' }),
+      });
+
+    expect(flood().accepted).toHaveLength(2);
+    expect(flood().accepted).toHaveLength(0);
   });
 
   it('caps the batch size', () => {
@@ -211,13 +229,116 @@ describe('ingestBatch', () => {
     expect(result.accepted).toHaveLength(2);
     expect(result.rejected).toHaveLength(2);
   });
+});
 
-  it('prefers the visitor id over the IP for the rate-limit key and hashes both', () => {
-    const visitorId = randomUUID();
-    expect(rateLimitKeyFor({ visitorId, ipAddress: '203.0.113.7' })).toBe(
-      `v:${hashIdentifier(visitorId, undefined)}`,
+describe('rateLimitKeysFor', () => {
+  /**
+   * These pin the property the whole limiter rests on: the budget a caller gets
+   * is decided by the one thing it cannot choose. The keys used to be picked
+   * visitor-first, and because a cookie-less request has a visitor id minted for
+   * it on the spot, dropping the cookie handed out a brand-new bucket on every
+   * single request — an unbounded write endpoint reachable with `curl`.
+   */
+  const ADDRESS = '203.0.113.7';
+
+  it('gives every cookie-less request from one address the same bucket', () => {
+    const keys = Array.from({ length: 20 }, () =>
+      /* What `resolveRuntimeContext` hands over for a request with no cookie:
+         a fresh visitor id, and the fact that nobody presented it. */
+      rateLimitKeysFor({ visitorId: randomUUID(), visitorPresented: false, ipAddress: ADDRESS }),
     );
-    expect(rateLimitKeyFor({})).toBe('anon');
+
+    expect(new Set(keys.map((entry) => entry.join('|'))).size).toBe(1);
+  });
+
+  it('limits a cookie-less flood instead of refilling it per request', () => {
+    const limiter = createRateLimiter({ capacity: 5, refillPerSecond: 0 });
+    const decisions = Array.from({ length: 20 }, () =>
+      takeAll(
+        limiter,
+        rateLimitKeysFor({ visitorId: randomUUID(), visitorPresented: false, ipAddress: ADDRESS }),
+      ),
+    );
+
+    expect(decisions.filter((decision) => decision.allowed)).toHaveLength(5);
+  });
+
+  it('buckets a presented visitor cookie by visitor, on top of its address', () => {
+    const visitorId = randomUUID();
+    const keys = rateLimitKeysFor({ visitorId, visitorPresented: true, ipAddress: ADDRESS });
+
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(`i:${hashIdentifier(ADDRESS)}`);
+    expect(keys[1]).toBe(`v:${hashIdentifier(visitorId)}|i:${hashIdentifier(ADDRESS)}`);
+    /* Two browsers behind one address are told apart, and neither escapes the
+       address bucket by being told apart. */
+    expect(
+      rateLimitKeysFor({ visitorId: randomUUID(), visitorPresented: true, ipAddress: ADDRESS })[1],
+    ).not.toBe(keys[1]);
+  });
+
+  it('never widens a budget by dropping the cookie', () => {
+    const visitorId = randomUUID();
+    const withCookie = rateLimitKeysFor({ visitorId, visitorPresented: true, ipAddress: ADDRESS });
+    const withoutCookie = rateLimitKeysFor({
+      visitorId: randomUUID(),
+      visitorPresented: false,
+      ipAddress: ADDRESS,
+    });
+
+    expect(withoutCookie).toContain(withCookie[0]);
+  });
+
+  it('keeps two addresses apart', () => {
+    const one = rateLimitKeysFor({ ipAddress: ADDRESS });
+    const other = rateLimitKeysFor({ ipAddress: '198.51.100.4' });
+    expect(one[0]).not.toBe(other[0]);
+  });
+
+  it('never puts a raw address in a key', () => {
+    const keys = rateLimitKeysFor({
+      visitorId: randomUUID(),
+      visitorPresented: true,
+      ipAddress: ADDRESS,
+      salt: 'pepper',
+    });
+
+    for (const key of keys) {
+      expect(key).not.toContain(ADDRESS);
+      expect(key).not.toContain('pepper');
+      expect(key).toMatch(/^(?:v:[0-9a-f]{32}\|)?i:[0-9a-f]{32}$/);
+    }
+  });
+
+  it('degrades an unknown address to one shared bucket rather than to no limit', () => {
+    const limiter = createRateLimiter({ capacity: 3, refillPerSecond: 0 });
+    const decisions = Array.from({ length: 10 }, () =>
+      takeAll(limiter, rateLimitKeysFor({ visitorId: randomUUID(), visitorPresented: false })),
+    );
+
+    expect(decisions.filter((decision) => decision.allowed)).toHaveLength(3);
+  });
+
+  it('stops charging once a bucket refuses', () => {
+    /* Once the address bucket is empty every later request from that address is
+       refused there, so the bucket of a visitor whose cookie is being replayed
+       keeps its tokens instead of being drained by the flood beside it. */
+    const limiter = createRateLimiter({ capacity: 2, refillPerSecond: 0 });
+    const flooder = rateLimitKeysFor({
+      visitorId: randomUUID(),
+      visitorPresented: true,
+      ipAddress: ADDRESS,
+    });
+    const bystander = rateLimitKeysFor({
+      visitorId: randomUUID(),
+      visitorPresented: true,
+      ipAddress: ADDRESS,
+    });
+
+    expect(takeAll(limiter, flooder).allowed).toBe(true);
+    expect(takeAll(limiter, flooder).allowed).toBe(true);
+    expect(takeAll(limiter, bystander).allowed).toBe(false);
+    expect(limiter.take(bystander[1] as string).allowed).toBe(true);
   });
 });
 
@@ -235,6 +356,24 @@ describe('createRateLimiter', () => {
 
     expect(limiter.take('k', 1, start + 1_000).allowed).toBe(true);
     expect(limiter.take('other', 1, start).allowed).toBe(true);
+  });
+});
+
+describe('createMemoryRateLimitStore', () => {
+  it('evicts the bucket that has gone longest without being charged', () => {
+    /* The store is bounded and a caller can mint keys at will by rotating its
+       cookie. Evicting in insertion order would drop the address bucket first —
+       the one bucket that is holding a flood back, and the one that is being
+       charged on every single request — which would hand the caller a full
+       budget again. */
+    const store = createMemoryRateLimitStore(2);
+    store.write('i:address', { tokens: 1, updatedAtMs: 1 });
+    store.write('v:one|i:address', { tokens: 1, updatedAtMs: 1 });
+    store.write('i:address', { tokens: 0, updatedAtMs: 2 });
+    store.write('v:two|i:address', { tokens: 1, updatedAtMs: 3 });
+
+    expect(store.read('i:address')?.tokens).toBe(0);
+    expect(store.read('v:one|i:address')).toBeUndefined();
   });
 });
 

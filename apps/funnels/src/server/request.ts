@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { getAppConfig, getServerEnv } from '@am/config';
+import { MINTED_VISITOR_HEADER } from '@am/tracking';
 import { resolveRuntimeContext, type RuntimeContext } from './runtime-context';
 import { requestHost } from './origin';
 
@@ -42,6 +43,10 @@ export function runtimeContextFrom(
     acceptLanguage: headerList.get('accept-language'),
     secFetchSite: headerList.get('sec-fetch-site'),
     isPreviewRoute,
+    /* The edge sets this on every request it matches, overwriting whatever the
+       caller sent, so a request that reaches a write endpoint carries the edge's
+       answer and not its own. */
+    visitorMintedAtEdge: headerList.get(MINTED_VISITOR_HEADER) === '1',
   });
 }
 

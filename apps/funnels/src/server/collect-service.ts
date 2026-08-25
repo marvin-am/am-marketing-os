@@ -50,8 +50,8 @@ export interface CollectContext {
   sessionId: string;
   /** Internal ids from a verified launch token. These win over the payload. */
   trusted: Partial<TrackingContext> | null;
-  /** Hashed key — never a raw IP address (rule 7). */
-  rateLimitKey: string;
+  /** Hashed keys, coarsest first — never a raw IP address (rule 7). */
+  rateLimitKeys: readonly string[];
   receivedAt?: string;
 }
 
@@ -149,7 +149,7 @@ export async function collectEvents(
     trusted,
     dedupe: deps.dedupe ?? defaultDedupe,
     limiter: deps.limiter,
-    rateLimitKey: context.rateLimitKey,
+    rateLimitKeys: context.rateLimitKeys,
     maxBatchSize: deps.maxBatchSize ?? DEFAULT_MAX_BATCH_SIZE,
   });
 

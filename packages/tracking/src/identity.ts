@@ -29,6 +29,17 @@ export const INTERNAL_COOKIE = 'am_internal';
 export const TEST_COOKIE = 'am_test';
 
 /**
+ * Request header the edge sets when it minted the visitor id it is forwarding.
+ *
+ * Identity is issued at the edge and handed to the route inside the `Cookie`
+ * header, which leaves nothing downstream able to tell an id the browser
+ * presented from one the edge invented a moment ago. Anything that treats a
+ * visitor id as evidence — the rate limiter above all — needs that difference,
+ * so the edge states it rather than letting the route guess.
+ */
+export const MINTED_VISITOR_HEADER = 'x-am-visitor-minted';
+
+/**
  * 400 days. Chrome caps cookie lifetime there, so anything longer is silently
  * truncated — writing the real cap keeps the code honest about what happens.
  */

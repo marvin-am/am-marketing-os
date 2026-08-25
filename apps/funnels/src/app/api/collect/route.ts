@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { rateLimitKeyFor } from '@am/tracking';
+import { rateLimitKeysFor } from '@am/tracking';
 import { collectEvents } from '@/server/collect-service';
 import { checkOrigin, requestHost } from '@/server/origin';
-import { clientAddress, collectLimiter } from '@/server/rate-limit';
+import { clientAddress, collectLimiter, rateLimitSalt } from '@/server/rate-limit';
 import { funnelServerConfig, runtimeContextFrom } from '@/server/request';
 import { getFunnelStore } from '@/server/store';
 
@@ -60,10 +60,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       visitorId: context.visitorId,
       sessionId: context.sessionId,
       trusted: context.tokenValid ? context.trusted : null,
-      /* Hashed — an IP address must never sit in a cache key or a log line. */
-      rateLimitKey: rateLimitKeyFor({
+      /* Hashed — an IP address must never sit in a cache key or a log line. The
+         address is always part of the key, so a caller that sends no cookie is
+         still charged to the address it is calling from. */
+      rateLimitKeys: rateLimitKeysFor({
         visitorId: context.visitorId,
+        visitorPresented: context.visitorPresented,
         ipAddress: clientAddress(request.headers),
+        salt: rateLimitSalt(),
       }),
     },
     { store: getFunnelStore(), limiter: collectLimiter },

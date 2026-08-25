@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { LAUNCH_TOKEN_PARAM } from '@am/domain/events';
 import {
+  MINTED_VISITOR_HEADER,
   PREVIEW_COOKIE,
   SESSION_COOKIE,
   VISITOR_COOKIE,
@@ -72,6 +73,13 @@ export function proxy(request: NextRequest): NextResponse {
     .filter((part): part is string => Boolean(part))
     .join('; ');
   headers.set('cookie', carried);
+
+  /* Forwarding the minted cookie above makes a first-time caller look like a
+     returning one to everything downstream. The write endpoints must not be
+     fooled by that: an id issued here is worth nothing as evidence, and a rate
+     limit that believed it would hand a fresh budget to every caller that omits
+     the cookie. Overwritten, never merged — the value is the edge's to state. */
+  headers.set(MINTED_VISITOR_HEADER, resolved.isNew ? '1' : '0');
 
   /*
    * Carry the signed launch token forward. It arrives once, on the landing URL,

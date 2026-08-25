@@ -30,7 +30,7 @@ function context(overrides: Partial<CollectContext> = {}): CollectContext {
     visitorId: VISITOR_ID,
     sessionId: SESSION_ID,
     trusted: null,
-    rateLimitKey: 'v:test',
+    rateLimitKeys: ['i:test'],
     ...overrides,
   };
 }

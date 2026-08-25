@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { rateLimitKeyFor } from '@am/tracking';
+import { rateLimitKeysFor, takeAll } from '@am/tracking';
 import { checkOrigin, requestHost } from '@/server/origin';
-import { clientAddress, submitLimiter } from '@/server/rate-limit';
+import { clientAddress, rateLimitSalt, submitLimiter } from '@/server/rate-limit';
 import { funnelServerConfig, runtimeContextFrom } from '@/server/request';
 import { getFunnelStore } from '@/server/store';
 import { RATE_LIMIT_MESSAGE_DE, submitLead } from '@/server/submit-service';
@@ -42,10 +42,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const decision = submitLimiter.take(
-    rateLimitKeyFor({
+  /* The address is always part of the key, so a caller that sends no cookie is
+     charged to the address it is calling from rather than to a bucket the
+     server just minted for it. */
+  const decision = takeAll(
+    submitLimiter,
+    rateLimitKeysFor({
       visitorId: context.visitorId,
+      visitorPresented: context.visitorPresented,
       ipAddress: clientAddress(request.headers),
+      salt: rateLimitSalt(),
     }),
   );
   if (!decision.allowed) {

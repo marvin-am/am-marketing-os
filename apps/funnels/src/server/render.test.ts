@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 process.env.LOG_LEVEL = 'error';
 
+import { MINTED_VISITOR_HEADER } from '@am/tracking';
 import { FIXTURE_FUNNEL_IDS, FIXTURE_SLUGS } from './fixture-store';
 import { assignFunnelArm } from './assignment';
 import { getPublishedFunnelBySlug, resetPublishedCache, resolveServedFunnel } from './published';
 import { prepareFunnel } from './render';
+import { runtimeContextFrom } from './request';
 import { resolveRuntimeContext } from './runtime-context';
 import { getFixtureStore, resetFunnelStore } from './store';
 
@@ -160,6 +162,54 @@ describe('what a render writes', () => {
     });
 
     expect(context.trafficKind).toBe('PREVIEW');
+  });
+
+  it('reports whether the visitor id was presented or minted', () => {
+    /* A minted id is indistinguishable from a returning one downstream unless
+       the resolver says so, and the rate limiter has to know: a caller that
+       sends no cookie gets a fresh id on every request, so treating that id as
+       an identity would give it a fresh budget on every request too. */
+    const resolve = (overrides: Record<string, unknown>) =>
+      resolveRuntimeContext({
+        cookieHeader: null,
+        userAgent: HUMAN_UA,
+        host: 'funnel.example.com',
+        url: 'https://funnel.example.com/f/potenzialanalyse',
+        referer: null,
+        acceptLanguage: 'de-DE',
+        secFetchSite: 'none',
+        now: new Date('2026-08-25T10:00:00.000Z'),
+        ...overrides,
+      });
+
+    expect(resolve({}).visitorPresented).toBe(false);
+    expect(contextFor(VISITOR_A, HUMAN_UA).visitorPresented).toBe(true);
+
+    /* The edge issues identity and forwards it in the cookie header, so a cookie
+       alone proves nothing about who sent it — a caller that omits `am_vid`
+       arrives here carrying one the edge minted a moment earlier. */
+    expect(
+      resolve({
+        cookieHeader: `am_vid=${VISITOR_A}`,
+        visitorMintedAtEdge: true,
+      }).visitorPresented,
+    ).toBe(false);
+  });
+
+  it('takes the edge at its word about a minted visitor id', () => {
+    const headerList = new Headers({
+      cookie: `am_vid=${VISITOR_A}`,
+      'user-agent': HUMAN_UA,
+      host: 'funnel.example.com',
+      'accept-language': 'de-DE',
+      [MINTED_VISITOR_HEADER]: '1',
+    });
+    const resolve = () =>
+      runtimeContextFrom(headerList, 'https://funnel.example.com/api/collect').visitorPresented;
+
+    expect(resolve()).toBe(false);
+    headerList.set(MINTED_VISITOR_HEADER, '0');
+    expect(resolve()).toBe(true);
   });
 
   it('hands the client the ids of the version it actually served', async () => {
