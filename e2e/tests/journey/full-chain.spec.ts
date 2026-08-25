@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test';
 import { FUNNEL_URL } from '../../fixtures/config';
 import { FormDriver } from '../../fixtures/form';
+import { waitForConsoleReady, waitForInteractive } from '../../fixtures/hydration';
 import {
   APPROVAL_LABELS_DE,
   CAMPAIGNS,
@@ -39,6 +40,9 @@ import { SubmitRecorder } from '../../fixtures/network';
  * than a console screen, the report says so.
  */
 
+/** The six concept keys the proposal generator emits. */
+const CREATIVE_KEYS = ['concept_1', 'concept_2', 'concept_3', 'concept_4', 'concept_5', 'concept_6'];
+
 /** Campaign states in workflow order, so "already past this" is decidable. */
 const STATE_ORDER = [
   'IDEA',
@@ -71,48 +75,79 @@ const STATE_LABELS_DE: Readonly<Record<WalkedState, string>> = {
   LIVE: 'Live',
 };
 
+/**
+ * The campaign's state, read off the header's status badge.
+ *
+ * The badge rather than the header text: the header also carries the next
+ * action, whose German copy legitimately mentions other states ("Live-Schaltung
+ * blockiert"), and a substring match there would report a paused draft as live.
+ */
 async function currentState(page: Page): Promise<WalkedState> {
-  const header = page.locator('[data-campaign-header]');
-  await expect(header).toBeVisible();
-  const text = (await header.textContent()) ?? '';
-  const found = STATE_ORDER.filter((state) => text.includes(STATE_LABELS_DE[state]));
-  /* "Strategie freigegeben" contains "Strategie in Prüfung"? It does not, but a
-     longer label could contain a shorter one, so the latest match wins. */
-  const state = found.at(-1);
-  if (!state) throw new Error(`Kein bekannter Kampagnenstatus im Kopf gefunden: ${text.slice(0, 200)}`);
+  const badge = page.locator(
+    '[data-campaign-header] [data-status-kind="campaign"][data-status-state]',
+  );
+  await expect(badge).toHaveCount(1);
+  const value = await badge.getAttribute('data-status-state');
+  const state = STATE_ORDER.find((candidate) => candidate === value);
+  if (!state) throw new Error(`Unbekannter Kampagnenstatus: ${value}`);
   return state;
 }
 
 /** Grants an approval on the open tab. Idempotent: approving twice is one act. */
 async function approve(page: Page, kindDe: string): Promise<void> {
+  await waitForConsoleReady(page);
   const button = page.getByRole('button', { name: /^(Freigeben|Erneut freigeben)$/ }).first();
   await expect(button, `Die Freigabe „${kindDe}" wird nicht angeboten.`).toBeEnabled();
   await button.click();
-  await expect(page.getByText(`Freigabe „${kindDe}" gespeichert.`)).toBeVisible();
+  await expect(page.getByText(`Freigabe „${kindDe}" gespeichert.`).first()).toBeVisible();
   await expect(page.locator('[data-approval-invalid]')).toHaveCount(0);
 }
 
 /**
- * Performs the state change when the tab offers it, and asserts the campaign is
- * already at or past it when it does not.
+ * Performs every state change the tab offers until the campaign has reached
+ * `to`, and asserts it is already at or past `to` when nothing is offered.
+ *
+ * A tab offers exactly one step at a time — the strategy tab, for instance,
+ * offers `STRATEGY_APPROVED` first and `ASSET_GENERATION` only afterwards — so
+ * reaching a target can take more than one press.
  */
 async function advanceTo(page: Page, to: WalkedState): Promise<void> {
-  const button = page.locator(`[data-advance-action="${to}"]`);
-  if ((await button.count()) === 0) {
-    const state = await currentState(page);
+  const target = STATE_ORDER.indexOf(to);
+  await waitForConsoleReady(page);
+  let state = await currentState(page);
+
+  for (let press = 0; press < STATE_ORDER.length && STATE_ORDER.indexOf(state) < target; press += 1) {
+    const button = page.locator('[data-advance-action]');
+    await expect(
+      button,
+      `Auf dem Weg nach „${STATE_LABELS_DE[to]}" bietet der Reiter bei Status „${STATE_LABELS_DE[state]}" keinen Schritt an.`,
+    ).toHaveCount(1);
+
+    const offered = await button.getAttribute('data-advance-action');
     expect(
-      STATE_ORDER.indexOf(state),
-      `Der Schritt nach „${STATE_LABELS_DE[to]}" wird nicht angeboten, obwohl die Kampagne noch auf „${STATE_LABELS_DE[state]}" steht.`,
-    ).toBeGreaterThanOrEqual(STATE_ORDER.indexOf(to));
-    return;
+      STATE_ORDER.indexOf(offered as WalkedState),
+      `Der angebotene Schritt „${offered}" führt nicht in Richtung „${STATE_LABELS_DE[to]}".`,
+    ).toBeGreaterThan(STATE_ORDER.indexOf(state));
+
+    await expect(button).toBeEnabled();
+    await button.click();
+
+    /* The confirmation banner sits inside the panel that the transition itself
+       removes, so the header's status badge is the authority. */
+    await page.reload();
+    await waitForConsoleReady(page);
+    const next = await currentState(page);
+    expect(
+      STATE_ORDER.indexOf(next),
+      `Der Schritt nach „${offered}" hat den Status nicht verändert.`,
+    ).toBeGreaterThan(STATE_ORDER.indexOf(state));
+    state = next;
   }
 
-  await expect(button).toBeEnabled();
-  await button.click();
-  await expect(page.getByText('Status geändert.')).toBeVisible();
-  await page.reload();
-  const state = await currentState(page);
-  expect(STATE_ORDER.indexOf(state)).toBeGreaterThanOrEqual(STATE_ORDER.indexOf(to));
+  expect(
+    STATE_ORDER.indexOf(state),
+    `Die Kampagne hat „${STATE_LABELS_DE[to]}" nicht erreicht.`,
+  ).toBeGreaterThanOrEqual(target);
 }
 
 test.describe('Die vollständige Kette', () => {
@@ -188,19 +223,20 @@ test.describe('Die vollständige Kette', () => {
     await operator.goto(`/builder/form/${PUBLISHED_FORM_VERSION_ID}`);
     await expect(operator.getByText('Veröffentlichte Version — schreibgeschützt')).toBeVisible();
     const publishedTitle = await operator.getByLabel('Überschrift').inputValue();
+    await waitForInteractive(operator.getByRole('button', { name: 'Versionen' }));
     await operator.getByRole('button', { name: 'Als neuen Entwurf bearbeiten' }).click();
 
     /* ---- 8. … and a new form version is created -------------------- */
-    await expect(operator).toHaveURL(/\/builder\/form\/[0-9a-f-]{36}$/);
-    expect(
-      operator.url(),
+    await expect(
+      operator,
       'Die Bearbeitung ist auf der veröffentlichten Version gelandet.',
-    ).not.toContain(PUBLISHED_FORM_VERSION_ID);
+    ).not.toHaveURL(new RegExp(PUBLISHED_FORM_VERSION_ID));
+    await expect(operator).toHaveURL(/\/builder\/form\/[0-9a-f-]{36}$/);
 
     const editedTitle = `${publishedTitle} (Testlauf)`;
     await operator.getByLabel('Überschrift').fill(editedTitle);
     await operator.getByRole('button', { name: 'Entwurf speichern' }).click();
-    await expect(operator.getByText(/Entwurf \d+ gespeichert\./)).toBeVisible();
+    await expect(operator.getByText(/Entwurf \d+ gespeichert\./).first()).toBeVisible();
 
     /* The published one is untouched — that is what the running experiment
        depends on. */
@@ -216,11 +252,22 @@ test.describe('Die vollständige Kette', () => {
     await advanceTo(operator, 'ASSET_GENERATION');
 
     await operator.goto(`/kampagnen/${campaignId}/creatives`);
-    const cards = operator.locator('[data-creative-key]');
-    for (let index = 0; index < 6; index += 1) {
-      const card = cards.nth(index);
-      const approveButton = card.getByRole('button', { name: 'Freigeben' });
-      if (await approveButton.isEnabled()) await approveButton.click();
+    await waitForConsoleReady(operator);
+    for (const key of CREATIVE_KEYS) {
+      const card = operator.locator(`[data-creative-key="${key}"]`);
+      /* Retried on the effect rather than clicked once: the page streams, so
+         the grid can still be un-hydrated while the shell above it answers, and
+         a click into that window is swallowed without any actionability check
+         noticing. Approving twice is the same act, so a retry costs nothing. */
+      await expect(async () => {
+        const approveButton = card.getByRole('button', { name: 'Creative freigeben' });
+        if (await approveButton.isVisible()) await approveButton.click();
+        await expect(card, `Creative „${key}" wurde nicht freigegeben.`).toHaveAttribute(
+          'data-review-state',
+          'APPROVED',
+          { timeout: 2_000 },
+        );
+      }).toPass({ timeout: 30_000 });
     }
     await expect(
       operator.locator('[data-creative-key][data-review-state="APPROVED"]'),
@@ -228,9 +275,6 @@ test.describe('Die vollständige Kette', () => {
     ).toHaveCount(6);
     await expect(operator.locator('[data-asset-gate-blocked]')).toHaveCount(0);
     await approve(operator, APPROVAL_LABELS_DE.ASSETS);
-    await advanceTo(operator, 'ASSET_REVIEW');
-
-    await operator.goto(`/kampagnen/${campaignId}/creatives`);
     await advanceTo(operator, 'TEST_PLAN_REVIEW');
 
     await operator.goto(`/kampagnen/${campaignId}/testplan`);
@@ -259,20 +303,95 @@ test.describe('Die vollständige Kette', () => {
     );
 
     /* ---- 11. a Meta draft is created, paused ------------------------ */
-    await advanceTo(operator, 'READY_FOR_META_DRAFT');
-    await operator.goto(`/kampagnen/${campaignId}/launch-qa`);
-    await advanceTo(operator, 'META_DRAFT_CREATED');
+    /*
+     * DEFECT — see the report.
+     *
+     * The paused draft must be reachable *without* the publication approval:
+     * `REQUIRED_APPROVALS_FOR_STATE` asks only for STRATEGY, ASSETS and
+     * TEST_PLAN for `READY_FOR_META_DRAFT` and `META_DRAFT_CREATED`, and the
+     * panel's own description says the publication approval only decides
+     * whether the draft ever leaves the paused state. But the Launch-QA tab
+     * renders its advance inside the PUBLISH approval panel, whose
+     * `advanceBlocked = !status.valid` disables the button until publication is
+     * approved — so the whole paused-draft workflow, the one thing that is
+     * supposed to work before any credential exists, cannot be performed.
+     *
+     * Asserted softly: the failure is recorded with its reason, and the rest of
+     * the chain below is still walked instead of being lost to an early exit.
+     */
+    await waitForConsoleReady(operator);
+    if ((await currentState(operator)) === 'READY_FOR_LAUNCH_QA') {
+      const draftAdvance = operator.locator('[data-advance-action="READY_FOR_META_DRAFT"]');
+      await expect(draftAdvance).toBeVisible();
+      await expect
+        .soft(
+          draftAdvance,
+          'Der pausierte Meta-Entwurf verlangt die Veröffentlichungsfreigabe, obwohl REQUIRED_APPROVALS_FOR_STATE sie für diesen Schritt nicht fordert.',
+        )
+        .toBeEnabled();
 
-    await operator.goto(`/kampagnen/${campaignId}/strategie`);
+      if (await draftAdvance.isDisabled()) {
+        /* Work around the defect so the chain can continue. The approval is not
+           a requirement of this step — granting it is the deviation, not the
+           test. */
+        await approve(operator, APPROVAL_LABELS_DE.PUBLISH);
+      }
+    }
+
+    await advanceTo(operator, 'READY_FOR_META_DRAFT');
+
+    /*
+     * The step that reaches Meta.
+     *
+     * With `EXTERNAL_WRITES_ENABLED=false` the console refuses to move the
+     * campaign into `META_DRAFT_CREATED`, because that state asserts something
+     * about Meta that no provider has confirmed. What can be driven through the
+     * UI is therefore everything up to the send: the operator sees the exact
+     * payload — a campaign created `PAUSED` — confirms it, and gets a dry run
+     * that says plainly that nothing was created and the status did not move.
+     * The paused draft itself is asserted below on the fixture campaign that
+     * has one. See the report.
+     */
+    await operator.goto(`/kampagnen/${campaignId}/launch-qa`);
+    await waitForConsoleReady(operator);
+    const metaAdvance = operator.locator('[data-advance-action="META_DRAFT_CREATED"]');
+    await expect(metaAdvance).toBeEnabled();
+    await metaAdvance.click();
+
+    const metaDialog = operator.getByRole('alertdialog');
+    await expect(metaDialog).toBeVisible();
+    await expect(metaDialog, 'Die Vorschau zeigt den Entwurf nicht als pausiert.').toContainText(
+      'PAUSED',
+    );
+    await expect(metaDialog.getByRole('button', { name: 'An Meta senden' })).toBeDisabled();
+    await metaDialog.getByRole('textbox').fill('AUSFÜHREN');
+    await metaDialog.getByRole('button', { name: 'An Meta senden' }).click();
+
+    await expect(operator.locator('[data-dry-run="true"]')).toContainText(
+      'Dry-Run – nicht ausgeführt',
+    );
+    expect(
+      await currentState(operator),
+      'Ein Dry-Run hat den Kampagnenstatus verändert.',
+    ).toBe('READY_FOR_META_DRAFT');
+
+    /* The campaign that does have a paused draft shows what one looks like:
+       the reality is the paused draft, never a live campaign. */
+    await openCampaign(CAMPAIGNS.metaDraft, 'strategie');
     await expect(
       operator.locator('[data-campaign-header]'),
       'Der Entwurf wird nicht als pausiert ausgewiesen.',
     ).toHaveAttribute('data-reality', 'META_DRAFT_PAUSED');
     await expect(operator.locator('[data-reality-banner="META_DRAFT_PAUSED"]')).toBeVisible();
-    /* And going live is still refused, because nothing external is connected.
-       (The Campaign Room does not currently offer a go-live control at all —
-       that is a defect of its own, asserted in `console/launch-qa.spec.ts`.) */
-    await operator.goto(`/kampagnen/${campaignId}/launch-qa`);
+
+    await openCampaign(CAMPAIGNS.metaDraft, 'versionen');
+    const metaCommand = operator.locator('[data-audit-action="meta.command_requested"]');
+    await expect(metaCommand).toContainText('Pausierter Meta-Entwurf angefordert.');
+    await expect(metaCommand).toContainText('CREATE_DRAFT_CAMPAIGN');
+    await expect(metaCommand, 'Der Entwurf wurde nicht pausiert angelegt.').toContainText('PAUSED');
+
+    /* And going live is still refused, because nothing external is connected. */
+    await openCampaign(CAMPAIGNS.metaDraft, 'launch-qa');
     await expect(operator.locator('[data-gate="gate-go-live"]')).toHaveAttribute(
       'data-gate-open',
       'false',
@@ -326,6 +445,7 @@ test.describe('Die vollständige Kette', () => {
 
     /* ---- 19.–21. HubSpot fails, the lead survives, a retry is offered  */
     await openCampaign(CAMPAIGNS.live, 'leads-sales');
+    await waitForConsoleReady(operator);
     const failed = operator.locator('[data-sync-status="FAILED_RETRYING"]');
     await expect(failed.first(), 'Kein fehlgeschlagener HubSpot-Sync im Datensatz.').toBeVisible();
     await expect(failed.first()).toContainText('429');
@@ -378,6 +498,7 @@ test.describe('Die vollständige Kette', () => {
 
     /* ---- 27. the Meta outcome is delivered deduplicated ------------- */
     await operator.goto('/integrationen/outbox');
+    await waitForConsoleReady(operator);
     const purchase = operator.locator(
       '[data-outbox-row="stage:6b0d3e82-5a17-4c94-8f26-1d7e9b0a3c58:CLOSED_WON:4"]',
     );
@@ -398,6 +519,7 @@ test.describe('Die vollständige Kette', () => {
 
     /* ---- 28.–30. a justified scale recommendation, confirmed -------- */
     await openCampaign(CAMPAIGNS.live, 'empfehlungen');
+    await waitForConsoleReady(operator);
     const scale = operator.locator('[data-recommendation-action="INCREASE_BUDGET"]');
     await expect(scale).toContainText('Tagesbudget um 20 % erhöhen');
     await expect(scale.locator('[data-fact-metric="cost_per_qualified_vq"]')).toBeVisible();

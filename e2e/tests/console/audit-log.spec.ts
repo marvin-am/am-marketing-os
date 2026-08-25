@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test';
+import { waitForConsoleReady } from '../../fixtures/hydration';
 import { APPROVAL_LABELS_DE, CAMPAIGNS } from '../../fixtures/ids';
 
 /**
@@ -78,6 +79,7 @@ test.describe('Audit-Log', () => {
     expect(before, 'Für diese Kampagne gibt es überhaupt keine Audit-Einträge.').toBeGreaterThan(0);
 
     await operator.goto(`/kampagnen/${campaignId}/strategie`);
+    await waitForConsoleReady(operator);
     await operator.getByRole('button', { name: /^(Freigeben|Erneut freigeben)$/ }).click();
     await expect(
       operator.getByText(`Freigabe „${APPROVAL_LABELS_DE.STRATEGY}" gespeichert.`),

@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test';
+import { waitForConsoleReady } from '../../fixtures/hydration';
 
 /**
  * The transactional outbox, which is where a provider outage becomes visible
@@ -18,6 +19,7 @@ test.describe('Outbox und Dead Letter', () => {
     operator,
   }) => {
     await operator.goto('/integrationen/outbox');
+    await waitForConsoleReady(operator);
 
     const row = operator.locator(`[data-outbox-row="${RATE_LIMITED_EVENT}"]`);
     await expect(row).toBeVisible();
@@ -59,6 +61,7 @@ test.describe('Outbox und Dead Letter', () => {
     operator,
   }) => {
     await operator.goto('/integrationen/outbox');
+    await waitForConsoleReady(operator);
 
     const row = operator.locator(`[data-outbox-row="${DEAD_LETTER_EVENT}"]`);
     await row.getByRole('button', { name: 'Erneut senden' }).click();

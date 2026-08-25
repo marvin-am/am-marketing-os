@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test';
+import { waitForInteractive } from '../../fixtures/hydration';
 import { PUBLISHED_FORM_VERSION_ID } from '../../fixtures/ids';
 
 /**
@@ -39,6 +40,7 @@ test.describe('Veröffentlichte Formularversion', () => {
     operator,
   }) => {
     await operator.goto(`/builder/form/${PUBLISHED_FORM_VERSION_ID}`);
+    await waitForInteractive(operator.getByRole('button', { name: 'Versionen' }));
     await operator.getByRole('button', { name: 'Als neuen Entwurf bearbeiten' }).click();
 
     /* The builder navigates to the new draft; its id is not the published one. */
@@ -53,7 +55,7 @@ test.describe('Veröffentlichte Formularversion', () => {
     await expect(operator.getByText('Nicht gespeicherte Änderungen')).toBeVisible();
 
     await operator.getByRole('button', { name: 'Entwurf speichern' }).click();
-    await expect(operator.getByText(/Entwurf \d+ gespeichert\./)).toBeVisible();
+    await expect(operator.getByText(/Entwurf \d+ gespeichert\./).first()).toBeVisible();
 
     await operator.reload();
     await expect(operator.getByLabel('Überschrift')).toHaveValue(edited);
@@ -71,6 +73,7 @@ test.describe('Veröffentlichte Formularversion', () => {
     operator,
   }) => {
     await operator.goto(`/builder/form/${PUBLISHED_FORM_VERSION_ID}`);
+    await waitForInteractive(operator.getByRole('button', { name: 'Versionen' }));
     await operator.getByRole('button', { name: 'Versionen' }).click();
 
     const history = operator.getByRole('region', { name: 'Versionsverlauf' });

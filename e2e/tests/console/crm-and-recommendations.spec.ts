@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test';
+import { waitForConsoleReady } from '../../fixtures/hydration';
 import { CAMPAIGNS, FUNNEL_PROPOSAL_NAMES } from '../../fixtures/ids';
 
 /**
@@ -77,6 +78,7 @@ test.describe('Leads und Vertrieb', () => {
     openCampaign,
   }) => {
     await openCampaign(CAMPAIGNS.live, 'leads-sales');
+    await waitForConsoleReady(operator);
 
     const failed = operator.locator('[data-sync-status="FAILED_RETRYING"]');
     await expect(failed.first()).toBeVisible();
@@ -135,6 +137,7 @@ test.describe('Empfehlungen', () => {
     openCampaign,
   }) => {
     await openCampaign(CAMPAIGNS.live, 'empfehlungen');
+    await waitForConsoleReady(operator);
 
     const scale = operator.locator('[data-recommendation-action="INCREASE_BUDGET"]');
     await scale.getByRole('button', { name: 'Annehmen und ausführen' }).click();

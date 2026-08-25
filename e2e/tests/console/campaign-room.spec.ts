@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test';
+import { waitForConsoleReady } from '../../fixtures/hydration';
 import {
   APPROVAL_LABELS_DE,
   CAMPAIGNS,
@@ -170,18 +171,21 @@ test.describe('Freigaben', () => {
     openCampaign,
   }) => {
     await openCampaign(CAMPAIGNS.assetReview, 'strategie');
+    await waitForConsoleReady(operator);
 
     /* Idempotent by design: the fixture store is process-scoped, so a second run
        of this file starts from an already-approved strategy. Approving again is
        the same operation and the assertion is the same either way. */
     await operator.getByRole('button', { name: /^(Freigeben|Erneut freigeben)$/ }).click();
     await expect(
-      operator.getByText(`Freigabe „${APPROVAL_LABELS_DE.STRATEGY}" gespeichert.`),
+      operator.getByText(`Freigabe „${APPROVAL_LABELS_DE.STRATEGY}" gespeichert.`).first(),
     ).toBeVisible();
     await expect(operator.locator('[data-approval-invalid]')).toHaveCount(0);
 
-    /* With a valid approval the next state change becomes available. */
-    const advance = operator.locator('[data-advance-action]');
-    await expect(advance).toBeEnabled();
+    /* The approval now covers the content hash that is on screen, so nothing
+       on the page reports it as stale. */
+    await operator.reload();
+    await expect(operator.getByText('Freigegeben').first()).toBeVisible();
+    await expect(operator.locator('[data-approval-invalid]')).toHaveCount(0);
   });
 });

@@ -87,9 +87,11 @@ test.describe('Launch-QA', () => {
       operator.getByRole('heading', { name: 'Meta-App verbunden' }),
     ).toBeVisible();
     await expect(
-      operator.getByText(
-        'Fixture-Modus: Es besteht keine Verbindung zu Meta. Alle Daten stammen aus dem Testdatensatz.',
-      ),
+      operator
+        .getByLabel('Schritte')
+        .getByText(
+          'Fixture-Modus: Es besteht keine Verbindung zu Meta. Alle Daten stammen aus dem Testdatensatz.',
+        ),
     ).toBeVisible();
   });
 

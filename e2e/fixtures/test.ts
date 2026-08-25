@@ -33,6 +33,21 @@ export interface AmFixtures {
   openCampaign: (name: string, tab?: string) => Promise<string>;
 }
 
+/**
+ * A distinct client address per simulated visitor, inside 198.18.0.0/15.
+ *
+ * The counter keeps two visitors in the same worker apart; the random base
+ * keeps two workers — and two consecutive runs against the same server process,
+ * whose token buckets refill slowly — from landing on the same address.
+ */
+const ADDRESS_BASE = Math.floor(Math.random() * 0x20000);
+let visitorCounter = 0;
+
+function visitorAddress(): string {
+  const offset = (ADDRESS_BASE + visitorCounter++) % 0x20000;
+  return `198.${18 + (offset >> 16)}.${(offset >> 8) & 0xff}.${offset & 0xff}`;
+}
+
 export const test = base.extend<AmFixtures>({
   roles: [['MARKETING_OPERATOR', 'MARKETING_LEAD', 'REVOPS'], { option: true }],
 
@@ -50,7 +65,23 @@ export const test = base.extend<AmFixtures>({
   },
 
   visitorContext: async ({ browser }, use) => {
-    const context = await browser.newContext({ baseURL: FUNNEL_URL, locale: 'de-DE' });
+    const context = await browser.newContext({
+      baseURL: FUNNEL_URL,
+      locale: 'de-DE',
+      /*
+       * Each simulated visitor arrives from its own address.
+       *
+       * The submit endpoint buckets its rate limit on the client address —
+       * deliberately, because that is the part of a request a caller cannot
+       * mint for itself — and ten submissions per six minutes is generous for a
+       * person and nothing at all for a suite. Every test here *is* a different
+       * visitor on a different connection, so saying so is more faithful than
+       * the alternative of running the whole suite as one household. The
+       * benchmarking range 198.18/15 is used because it can never be a real
+       * client.
+       */
+      extraHTTPHeaders: { 'x-forwarded-for': visitorAddress() },
+    });
     await use(context);
     await context.close();
   },
