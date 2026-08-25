@@ -60,6 +60,14 @@ export const serverEnvSchema = z.object({
   OPENAI_TEXT_MODEL: z.string().default('gpt-5.6-sol'),
   OPENAI_IMAGE_MODEL: z.string().default('gpt-image-2'),
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-large'),
+  /**
+   * Must match the `vector(n)` width of `knowledge_embeddings.embedding`.
+   * 1536 rather than the model's native 3072 because pgvector cannot build
+   * an ivfflat/hnsw index above 2000 dimensions, and an unindexed
+   * similarity column is the same as no similarity search.
+   * `text-embedding-3-large` supports the reduction natively.
+   */
+  OPENAI_EMBEDDING_DIMENSIONS: intFromEnv(1536),
 
   META_APP_ID: optionalString,
   META_APP_SECRET: optionalString,

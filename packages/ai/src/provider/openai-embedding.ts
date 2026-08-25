@@ -22,7 +22,14 @@ export interface OpenAiEmbeddingProviderOptions {
   retry?: RetryOptions;
 }
 
-const DEFAULT_DIMENSIONS = 3072;
+/**
+ * The width comes from configuration, not from the model's native size:
+ * `knowledge_embeddings.embedding` is `vector(1536)` because pgvector cannot
+ * index above 2000 dimensions, and a mismatch here fails every insert.
+ */
+function configuredDimensions(): number {
+  return getModelConfig().embeddingDimensions;
+}
 
 export class OpenAiEmbeddingProvider implements EmbeddingProvider {
   readonly kind = 'openai' as const;
@@ -34,7 +41,7 @@ export class OpenAiEmbeddingProvider implements EmbeddingProvider {
   constructor(options: OpenAiEmbeddingProviderOptions = {}) {
     this.options = options;
     this.model = options.model ?? getModelConfig().embedding;
-    this.dimensions = options.dimensions ?? DEFAULT_DIMENSIONS;
+    this.dimensions = options.dimensions ?? configuredDimensions();
   }
 
   async embed(texts: string[]): Promise<number[][]> {

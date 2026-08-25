@@ -82,6 +82,8 @@ export interface ModelConfig {
   text: string;
   image: string;
   embedding: string;
+  /** Vector width requested from the embedding model. */
+  embeddingDimensions: number;
   baseUrl: string | null;
   apiKey: string | null;
 }
@@ -92,6 +94,7 @@ export function getModelConfig(): ModelConfig {
     text: env.OPENAI_TEXT_MODEL,
     image: env.OPENAI_IMAGE_MODEL,
     embedding: env.OPENAI_EMBEDDING_MODEL,
+    embeddingDimensions: env.OPENAI_EMBEDDING_DIMENSIONS,
     baseUrl: env.OPENAI_BASE_URL,
     apiKey: env.OPENAI_API_KEY,
   };

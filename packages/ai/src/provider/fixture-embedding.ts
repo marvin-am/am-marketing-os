@@ -28,7 +28,8 @@ export interface FixtureEmbeddingProviderOptions {
   shingleSize?: number;
 }
 
-const DEFAULT_DIMENSIONS = 512;
+/** Matches the configured live width so both paths fit the same column. */
+const DEFAULT_DIMENSIONS = 1536;
 
 export class FixtureEmbeddingProvider implements EmbeddingProvider {
   readonly kind = 'fixture' as const;
