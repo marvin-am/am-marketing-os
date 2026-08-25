@@ -110,6 +110,13 @@ HINT: Legen Sie eine neue Version an, statt die veröffentlichte zu verändern.
 that is exactly the kind of mistake nobody notices until the decision has
 already been made.
 
+`published_funnels` freezes on `is_live` rather than on a `state` column: the
+row binds a public slug to the exact funnel version, form version, consent
+version and pixel a submission was delivered against, so editing it in place
+rewrites the history of every submission already made under that slug.
+`unpublished_at` and `is_live` stay writable, because retiring a funnel is not
+the same as rewriting it.
+
 ### PII separation
 
 Submission answers are split across two tables by data class:
@@ -121,8 +128,19 @@ Submission answers are split across two tables by data class:
 - `submission_pii_encrypted` — AES-256-GCM ciphertext plus `key_version`. Never
   joined into analytics, never logged.
 
-`events` and `touchpoints` have no PII columns at all. The guard is the absence
-of a place to put it.
+`events` and `touchpoints` have no PII *column*, but that is not the same as
+having nowhere to put personal data: `events.metadata` is `jsonb`, and
+`events.referrer` and `events.landing_url` are free text. An adversarial review
+stored a lead's e-mail and phone number in all three by calling the RPC
+directly, which skips the collector route where the only scan lived.
+
+So the guard is a scan in both places, and neither is allowed to be the only
+one. `findPiiViolations()` in `@am/domain` refuses the batch at the route;
+`app.jsonb_pii_violations()` refuses it again inside
+`record_tracking_events()`. Both refuse the whole batch rather than stripping
+the offending field — a "cleaned" event teaches the emitting code that sending
+personal data is survivable. `packages/db/integration/pii-guard-parity.test.ts`
+runs a shared corpus through both and fails if they ever disagree.
 
 ### Attribution
 
@@ -185,6 +203,18 @@ The `anon` role — used by the public funnel runtime — can read
 CRM state, campaign strategy or audit logs. Public writes go through narrow
 server endpoints and `SECURITY DEFINER` functions, never direct table access
 from a browser.
+
+Table privileges were never the whole story, though, and the gap is worth
+naming because it is not obvious: **PostgreSQL grants `EXECUTE` on a new
+function to `PUBLIC`,** and `anon` inherits `PUBLIC` like every other role.
+`revoke all on all functions … from anon` removes a grant `anon` does not hold
+and leaves the one it does, so for a while every function in `public` was
+callable with the published anon key — including the ones written for the job
+runner. `0017_harden_privileges.sql` revokes from `PUBLIC` explicitly, sets the
+default privilege so a later migration cannot reopen it, and re-grants each
+function to the roles that call it. `anon` is left with exactly one:
+`get_published_funnel()`. `supabase/tests/privileges.test.ts` asserts that
+list, and fails if it grows.
 
 The service role bypasses RLS and is server-only; `getServerEnv()` throws if the
 key is read in a browser context.

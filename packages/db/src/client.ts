@@ -4,13 +4,20 @@
  * Three clients, three trust levels:
  *
  *   `createBrowserDbClient()`  anon key, runs in the browser, sees exactly one
- *                              table (`published_funnels`) plus the six funnel
- *                              runtime RPCs.
+ *                              table (`published_funnels`) and one function
+ *                              (`get_published_funnel`).
  *   `createServerDbClient()`   anon key + the signed-in user's cookies. RLS
  *                              applies, so the console can only ever read what
  *                              the operator is a member of.
  *   `createAdminDbClient()`    service role. Bypasses RLS, therefore refuses to
  *                              exist in a browser.
+ *
+ * The anon key writes nothing. It once carried EXECUTE on the whole funnel
+ * runtime — enough to submit a lead against a retired funnel, and, through
+ * PUBLIC's default grant, enough to read every pending lead out of the outbox.
+ * The write path now runs entirely on the server under the service role
+ * (`0017_harden_privileges.sql`), which is why this factory has no call sites:
+ * it exists for a public read, and nothing yet needs one from the browser.
  *
  * Every factory returns `null` when Supabase is not configured, so DEMO_MODE
  * runs the whole product against `createMemoryDatabase()` without a database.

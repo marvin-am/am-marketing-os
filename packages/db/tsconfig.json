@@ -9,7 +9,11 @@
   },
   "include": [
     "src/**/*",
-    "integration/**/*"
+    "integration/**/*",
+    // The Postgres suites live next to the migrations they exercise, not in a
+    // workspace of their own, so nothing typechecked them — vitest strips types
+    // without checking. They belong to this package's surface either way.
+    "../../supabase/tests/**/*"
   ],
   "exclude": [
     "node_modules",

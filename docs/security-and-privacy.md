@@ -36,6 +36,26 @@ state, campaign strategy or audit logs. Writes from the public runtime go
 through narrowly scoped server endpoints and `SECURITY DEFINER` functions, never
 direct table writes from a browser.
 
+RLS is only half of that guarantee, and the other half is easy to get wrong:
+Supabase publishes every function in `public` as `POST /rest/v1/rpc/<name>`, and
+PostgreSQL grants `EXECUTE` on a new function to `PUBLIC`, which `anon`
+inherits. Revoking from `anon` does not touch it. `0017_harden_privileges.sql`
+therefore revokes from `PUBLIC` by name, pins the default privilege for future
+migrations, and re-grants function by function; `supabase/tests/privileges.test.ts`
+asserts that `anon` ends up with exactly one callable function and that PUBLIC
+ends up with none.
+
+Two RPCs additionally refuse work they cannot stand behind, because a privilege
+boundary that only one migration enforces is one edit away from being gone:
+
+- `record_tracking_events()` rejects a batch containing personal data, and takes
+  `traffic_kind`, `environment` and `visitor_id` from the session rather than
+  from the caller. A request cannot declare itself production traffic.
+- `submit_lead_transactional()` requires a live, published funnel and a session
+  the server opened, and refuses an `EXACT` attribution with no click id or
+  signed token behind it. Temporal proximity has never been sufficient for
+  `EXACT`, and this is where that stops being a convention.
+
 The service role key is **server-only**. It is never prefixed `NEXT_PUBLIC_`,
 never imported into a client component, and `getServerEnv()` throws if it is
 read in a browser context. An ESLint rule flags inline `process.env`

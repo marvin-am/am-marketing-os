@@ -11,6 +11,8 @@ import { announceSkip, HAS_DATABASE, setupDatabase, type Harness, type PgClient 
 const WORKSPACE = '11111111-1111-4111-8111-111111111111';
 const PUBLISHED_FUNNEL = 'ffffffff-0000-4000-8000-000000000005';
 const META_ACCOUNT = 'bbbbbbbb-0000-4000-8000-000000000001';
+const VISITOR = 'ffffffff-0000-4000-8000-000000000006';
+const SESSION = 'ffffffff-0000-4000-8000-000000000007';
 
 if (!HAS_DATABASE) announceSkip('supabase/tests/idempotency.test.ts');
 
@@ -18,6 +20,12 @@ function submitPayload(attemptId: string) {
   return {
     submission_attempt_id: attemptId,
     published_funnel_id: PUBLISHED_FUNNEL,
+    /* A submission belongs to a session the server opened, and EXACT
+       attribution has to name the evidence it rests on — here the click id the
+       visitor arrived with. Both are enforced by the RPC, so a payload without
+       them is not a shape the runtime ever produces. */
+    session_id: SESSION,
+    visitor_id: VISITOR,
     consent_status: 'GRANTED',
     consent_purposes: ['CONTACT', 'AD_MEASUREMENT'],
     answers: [
@@ -31,7 +39,12 @@ function submitPayload(attemptId: string) {
       ciphertext: Buffer.from('geheim').toString('base64'),
       email_hash: 'd'.repeat(64),
     },
-    attribution: { channel: 'META_PAID', level: 'REVENUE_LINKED', confidence: 'EXACT' },
+    attribution: {
+      channel: 'META_PAID',
+      level: 'REVENUE_LINKED',
+      confidence: 'EXACT',
+      fbclid: 'IwAR0testklickid',
+    },
     outbox: {
       destination: 'HUBSPOT',
       event_id: `lead:${attemptId}`,
@@ -97,6 +110,15 @@ describe.skipIf(!HAS_DATABASE)('idempotency', () => {
                'ffffffff-0000-4000-8000-000000000004', 'ffffffff-0000-4000-8000-000000000003',
                'potenzialanalyse', true, 'eeeeeeee-0000-4000-8000-000000000001')`,
       [WORKSPACE, PUBLISHED_FUNNEL],
+    );
+    await admin.query(
+      `insert into public.visitors (id, workspace_id) values ($2, $1)`,
+      [WORKSPACE, VISITOR],
+    );
+    await admin.query(
+      `insert into public.sessions (id, workspace_id, visitor_id, published_funnel_id, funnel_version_id)
+       values ($2, $1, $3, $4, 'ffffffff-0000-4000-8000-000000000004')`,
+      [WORKSPACE, SESSION, VISITOR, PUBLISHED_FUNNEL],
     );
     await admin.query(
       `insert into public.meta_accounts (id, workspace_id, external_id, name) values ($2, $1, 'act_1', 'A&M')`,
