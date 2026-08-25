@@ -34,17 +34,18 @@
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@types/node": "22.19.0",
+    "@types/pg": "8.15.6",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.1.0",
     "eslint": "9.39.5",
     "eslint-config-prettier": "10.1.8",
     "jsdom": "27.0.1",
+    "pg": "8.16.3",
     "prettier": "3.9.6",
     "turbo": "2.10.11",
     "typescript": "5.9.3",
     "typescript-eslint": "8.68.0",
-    "vite-tsconfig-paths": "5.1.4",
     "vitest": "4.1.11"
   }
 }
