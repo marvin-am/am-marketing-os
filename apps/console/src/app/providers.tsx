@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@am/ui';
+import { Toaster, TooltipProvider } from '@am/ui';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Created lazily per browser session so server-rendered requests never share
@@ -31,7 +31,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
       <Toaster />
     </QueryClientProvider>
   );

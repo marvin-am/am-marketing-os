@@ -29,10 +29,6 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },
-  eslint: {
-    // Linting runs as its own turbo task against the shared flat config.
-    ignoreDuringBuilds: true,
-  },
   async headers() {
     return [
       {

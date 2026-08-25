@@ -21,9 +21,6 @@ const nextConfig: NextConfig = {
     '@am/observability',
   ],
   poweredByHeader: false,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   images: {
     formats: ['image/webp'],
   },
