@@ -50,6 +50,45 @@ pg.types.setTypeParser(PG_DATE, (value) => value);
 pg.types.setTypeParser(PG_TIMESTAMP, (value) => new Date(`${value}Z`).toISOString());
 pg.types.setTypeParser(PG_TIMESTAMPTZ, (value) => new Date(value).toISOString());
 
+interface EmbedRelation {
+  table: string;
+  /** Column on the parent row the child is matched against. */
+  parentKey: string;
+  /** Column on the child row carrying the parent's key. */
+  foreignKey: string;
+  toOne: boolean;
+}
+
+/** The embeds the repositories actually ask for. Anything else fails loudly. */
+const EMBEDS: Readonly<Record<string, EmbedRelation>> = {
+  // `experiments.observations()`: one lead per accepted submission.
+  'form_submissions.leads': {
+    table: 'leads',
+    parentKey: 'id',
+    foreignKey: 'submission_id',
+    toOne: true,
+  },
+};
+
+/** Splits a PostgREST select list without cutting inside an embed's parens. */
+function splitTopLevel(select: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of select) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (char === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
 export interface PgConnectionLike {
   query<Row extends Record<string, unknown>>(
     text: string,
@@ -117,6 +156,8 @@ class Query implements PromiseLike<PostgrestResult> {
   private payload: Record<string, unknown>[] = [];
   private insertOptions: InsertOptions = {};
 
+  private embeds: { name: string; columns: string }[] = [];
+
   constructor(
     private readonly connection: PgConnectionLike,
     private readonly table: string,
@@ -125,10 +166,18 @@ class Query implements PromiseLike<PostgrestResult> {
   /* ---- shape ---- */
 
   select(columns = '*', options: SelectOptions = {}): this {
-    if (columns.includes('(')) {
-      throw new Error(`Embedded selects are not supported by this shim: ${columns}`);
-    }
-    this.columns = columns;
+    /* PostgREST resolves an embed by following a declared foreign key. This
+       shim resolves it as a second query, which is not what PostgREST does but
+       produces the same shape — and refusing it outright, as an earlier version
+       did, only pushed the caller into a second shim. `EMBEDS` names the
+       relations the repositories actually ask for; anything else still fails
+       loudly rather than silently coming back empty. */
+    const parts = splitTopLevel(columns);
+    this.embeds = parts
+      .map((part) => /^([a-z_]+)\((.*)\)$/i.exec(part))
+      .filter((match): match is RegExpExecArray => match !== null)
+      .map((match) => ({ name: match[1] as string, columns: match[2] as string }));
+    this.columns = parts.filter((part) => !/^[a-z_]+\(.*\)$/i.test(part)).join(', ') || '*';
     this.wantCount = options.count === 'exact';
     if (this.mode !== 'select') this.returning = true;
     return this;
@@ -272,10 +321,43 @@ class Query implements PromiseLike<PostgrestResult> {
   private async run(): Promise<PostgrestResult> {
     try {
       const rows = await this.execute();
+      await this.resolveEmbeds(rows);
       const count = this.wantCount ? await this.countRows() : null;
       return this.shape(rows, count);
     } catch (error) {
       return { data: null, error: toPostgrestError(error), count: null };
+    }
+  }
+
+  /** One extra query per embed, keyed on the parent rows already fetched. */
+  private async resolveEmbeds(rows: Record<string, unknown>[]): Promise<void> {
+    for (const embed of this.embeds) {
+      const relation = EMBEDS[`${this.table}.${embed.name}`];
+      if (!relation) {
+        throw new Error(`Unsupported embed for this shim: ${this.table}.${embed.name}`);
+      }
+      const keys = rows.map((row) => row[relation.parentKey]).filter((key) => key !== null);
+      const embedded =
+        keys.length === 0
+          ? []
+          : (
+              await this.connection.query<Record<string, unknown>>(
+                `select ${relation.foreignKey}, ${embed.columns} from public.${relation.table}` +
+                  ` where ${relation.foreignKey} = any($1)`,
+                [keys],
+              )
+            ).rows;
+
+      const byParent = new Map<unknown, Record<string, unknown>[]>();
+      for (const row of embedded) {
+        const bucket = byParent.get(row[relation.foreignKey]);
+        if (bucket) bucket.push(row);
+        else byParent.set(row[relation.foreignKey], [row]);
+      }
+      for (const row of rows) {
+        const matches = byParent.get(row[relation.parentKey]) ?? [];
+        row[embed.name] = relation.toOne ? (matches[0] ?? null) : matches;
+      }
     }
   }
 
