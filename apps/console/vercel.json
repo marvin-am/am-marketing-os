@@ -1,0 +1,61 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@am/console",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "outputDirectory": ".next",
+  "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/outbox-dispatch",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/meta-insights",
+      "schedule": "7 * * * *"
+    },
+    {
+      "path": "/api/cron/meta-backfill",
+      "schedule": "20 3 * * *"
+    },
+    {
+      "path": "/api/cron/hubspot-reconcile",
+      "schedule": "35 * * * *"
+    },
+    {
+      "path": "/api/cron/hubspot-reconcile-deep",
+      "schedule": "50 4 * * *"
+    },
+    {
+      "path": "/api/cron/derive-abandoned-forms",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/performance-rollups",
+      "schedule": "10 2 * * *"
+    },
+    {
+      "path": "/api/cron/learning-cards",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "path": "/api/cron/recommendations",
+      "schedule": "25 6 * * *"
+    },
+    {
+      "path": "/api/cron/integration-health",
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ]
+}
