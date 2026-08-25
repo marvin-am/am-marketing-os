@@ -1,0 +1,23 @@
+{
+  "name": "@am/creative-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "echo \"source package — consumed via transpilePackages\"",
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "sharp": "0.35.3",
+    "@am/domain": "workspace:*",
+    "@am/config": "workspace:*",
+    "zod": "4.4.3"
+  }
+}

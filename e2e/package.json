@@ -1,0 +1,22 @@
+{
+  "name": "@am/e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "build": "echo \"e2e suite\""
+  },
+  "dependencies": {
+    "@am/domain": "workspace:*",
+    "@am/funnel-schema": "workspace:*",
+    "@am/db": "workspace:*",
+    "@am/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

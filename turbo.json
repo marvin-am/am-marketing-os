@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalDependencies": [".env.example", "tsconfig.base.json"],
+  "globalEnv": [
+    "NODE_ENV",
+    "CI",
+    "DEMO_MODE",
+    "EXTERNAL_WRITES_ENABLED",
+    "META_MUTATIONS_ENABLED",
+    "META_CAPI_ENABLED",
+    "HUBSPOT_WRITES_ENABLED"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    }
+  }
+}

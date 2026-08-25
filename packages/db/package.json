@@ -1,0 +1,29 @@
+{
+  "name": "@am/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "echo \"source package — consumed via transpilePackages\"",
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.4",
+    "@supabase/ssr": "0.8.0",
+    "@am/domain": "workspace:*",
+    "@am/config": "workspace:*",
+    "@am/observability": "workspace:*",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "pg": "8.16.3",
+    "@types/pg": "8.15.6"
+  }
+}
