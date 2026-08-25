@@ -22,6 +22,7 @@ import {
   NO_VALUE,
   type ValueScale,
 } from '../lib/format';
+import { metricBasisDe, noDenominatorNoteDe } from '../lib/metric-basis';
 import { AttributionCoverageBadge } from './attribution-coverage-badge';
 import { DataMaturityBadge } from './data-maturity-badge';
 import { InfoHint } from './tooltip';
@@ -129,10 +130,14 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(func
     ? formatMetricValueDe(metricKey, numericValue, currency, valueScale)
     : formatPercentDe(numericValue);
 
-  const fraction =
-    numerator !== null && denominator !== null
+  /* A MetricValue knows its own units, so its basis is formatted per side and
+     named; a bare Rate is a count over a count and needs no unit. */
+  const fraction = asMetricValue
+    ? metricBasisDe(asMetricValue)
+    : numerator !== null && denominator !== null
       ? `${formatCountDe(numerator)} / ${formatCountDe(denominator)}`
       : null;
+  const noDenominatorNote = asMetricValue ? noDenominatorNoteDe(asMetricValue) : null;
 
   const direction: MetricDirection =
     targetDirection ?? definition?.direction ?? 'HIGHER_IS_BETTER';
@@ -205,7 +210,7 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(func
       >
         {denominatorLabel ?? fraction ?? definition?.formula ?? 'Keine Bezugsgröße hinterlegt'}
         {numericValue === null && fraction ? (
-          <span className="ml-1">– kein Nenner, daher {NO_VALUE}</span>
+          <span className="ml-1">{noDenominatorNote ?? `– kein Nenner, daher ${NO_VALUE}`}</span>
         ) : null}
       </p>
 

@@ -33,16 +33,26 @@ export interface RecommendationExecutionRunner {
   (input: { campaignId: string; recommendationId: string }): Promise<ActionResult<CommandOutcome>>;
 }
 
+export interface RecommendationDecisionRunner {
+  (input: {
+    campaignId: string;
+    recommendationId: string;
+    decision: 'ACCEPT' | 'DISMISS';
+  }): Promise<ActionResult<RecommendationView>>;
+}
+
 export function RecommendationList({
   campaignId,
   views,
   canExecute,
   execute,
+  decide,
 }: {
   campaignId: string;
   views: RecommendationView[];
   canExecute: boolean;
   execute: RecommendationExecutionRunner;
+  decide: RecommendationDecisionRunner;
 }) {
   const open = views.filter((view) => view.recommendation.state === 'OPEN');
   const decided = views.filter((view) => view.recommendation.state !== 'OPEN');
@@ -74,6 +84,7 @@ export function RecommendationList({
                   view={view}
                   canExecute={canExecute}
                   execute={execute}
+                  decide={decide}
                 />
               </li>
             ))}
@@ -91,6 +102,7 @@ export function RecommendationList({
                   view={view}
                   canExecute={canExecute}
                   execute={execute}
+                  decide={decide}
                 />
               </li>
             ))}
@@ -106,34 +118,62 @@ export function RecommendationList({
  * denominator, what it is compared against, how mature and how certain that is,
  * the risk, the Meta objects it touches, and the exact action.
  *
- * Executing opens a `ConfirmDialog` showing precisely what would be sent, and
- * nothing happens until it is confirmed. Only a **provider-confirmed** command
- * renders as done; a dry run renders as `DryRunNotice` and never as success
- * (AGENTS.md rules 2 and 3, acceptance criteria 22 and 23).
+ * Two kinds of recommendation, and they get different controls, because a
+ * button that cannot succeed is worse than no button:
+ *
+ * - **Touches Meta** (`affectedMetaObjects` is not empty) — executing opens a
+ *   `ConfirmDialog` showing precisely what would be sent, and nothing happens
+ *   until it is confirmed. Only a **provider-confirmed** command renders as
+ *   done; a dry run renders as `DryRunNotice` and never as success (AGENTS.md
+ *   rules 2 and 3, acceptance criteria 22 and 23).
+ * - **Touches nothing** — there is no payload, so there is no Meta dialog to
+ *   show. It is accepted or dismissed, which are states of our own record.
+ *
+ * Dismissing is offered for both: an operator must be able to clear a proposal
+ * they disagree with without pretending to execute it.
  */
 export function RecommendationCard({
   campaignId,
   view,
   canExecute,
   execute,
+  decide,
 }: {
   campaignId: string;
   view: RecommendationView;
   canExecute: boolean;
   execute: RecommendationExecutionRunner;
+  decide: RecommendationDecisionRunner;
 }) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [decided, setDecided] = React.useState<RecommendationView | null>(null);
   const action = useAction(execute);
-  const rec = view.recommendation;
+  const decision = useAction(decide);
+
+  // The server's answer wins over the props until the route re-renders, so a
+  // decided recommendation stops offering the controls it no longer has.
+  React.useEffect(() => setDecided(null), [view]);
+  const current = decided ?? view;
+  const rec = current.recommendation;
+  const touchesMeta = rec.affectedMetaObjects.length > 0;
 
   const confirmedCommand =
-    view.command && isProviderConfirmed(view.command) ? view.command : null;
+    current.command && isProviderConfirmed(current.command) ? current.command : null;
   const settled = action.phase.kind === 'settled' ? action.phase.result : null;
   const executedNow = settled?.status === 'ok' ? settled.data : null;
   const executionConfirmed =
     confirmedCommand !== null ||
     (executedNow !== null &&
       (executedNow.state === 'PROVIDER_CONFIRMED' || executedNow.state === 'RECONCILED'));
+
+  const runDecision = async (verdict: 'ACCEPT' | 'DISMISS') => {
+    const result = await decision.execute({
+      campaignId,
+      recommendationId: rec.id,
+      decision: verdict,
+    });
+    if (result.status === 'ok') setDecided(result.data);
+  };
 
   return (
     <article
@@ -232,7 +272,7 @@ export function RecommendationCard({
         <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
           Genaue Aktion
         </p>
-        <p className="mt-1 text-sm leading-relaxed text-foreground">{view.actionSummaryDe}</p>
+        <p className="mt-1 text-sm leading-relaxed text-foreground">{current.actionSummaryDe}</p>
       </div>
 
       {executionConfirmed ? (
@@ -246,18 +286,21 @@ export function RecommendationCard({
             . Nur ein bestätigter Befehl wird hier als erledigt angezeigt.
           </AlertDescription>
         </Alert>
-      ) : view.command ? (
+      ) : current.command ? (
         <Alert tone="warning" icon={<ShieldAlert aria-hidden="true" />}>
           <AlertTitle>Noch nicht vom Provider bestätigt</AlertTitle>
           <AlertDescription>
-            Der Befehl steht auf <StatusBadge kind="command" state={view.command.state} size="sm" />.
-            Bis zur Bestätigung durch Meta gilt die Änderung als nicht ausgeführt.
-            {view.command.error ? <span className="mt-1 block">{view.command.error}</span> : null}
+            Der Befehl steht auf{' '}
+            <StatusBadge kind="command" state={current.command.state} size="sm" />. Bis zur
+            Bestätigung durch Meta gilt die Änderung als nicht ausgeführt.
+            {current.command.error ? (
+              <span className="mt-1 block">{current.command.error}</span>
+            ) : null}
           </AlertDescription>
         </Alert>
       ) : null}
 
-      {view.lastDryRun ? <DryRunNotice result={view.lastDryRun} /> : null}
+      {current.lastDryRun ? <DryRunNotice result={current.lastDryRun} /> : null}
 
       <ActionFeedback
         phase={action.phase}
@@ -265,16 +308,43 @@ export function RecommendationCard({
         pendingDe="Befehl wird an Meta übermittelt …"
       />
 
+      <ActionFeedback
+        phase={decision.phase}
+        successDe="Empfehlung entschieden. Es wurde nichts an Meta gesendet."
+        pendingDe="Entscheidung wird gespeichert …"
+      />
+
       {rec.state === 'OPEN' ? (
         canExecute ? (
           <div className="flex flex-wrap gap-2">
+            {touchesMeta ? (
+              <Button
+                size="sm"
+                data-execute-recommendation={rec.id}
+                disabled={action.pending || decision.pending}
+                onClick={() => setDialogOpen(true)}
+              >
+                Annehmen und ausführen
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                data-accept-recommendation={rec.id}
+                disabled={decision.pending}
+                loading={decision.pending}
+                onClick={() => void runDecision('ACCEPT')}
+              >
+                Annehmen
+              </Button>
+            )}
             <Button
               size="sm"
-              data-execute-recommendation={rec.id}
-              disabled={action.pending}
-              onClick={() => setDialogOpen(true)}
+              variant="secondary"
+              data-dismiss-recommendation={rec.id}
+              disabled={action.pending || decision.pending}
+              onClick={() => void runDecision('DISMISS')}
             >
-              Annehmen und ausführen
+              Verwerfen
             </Button>
           </div>
         ) : (
@@ -284,31 +354,33 @@ export function RecommendationCard({
         )
       ) : null}
 
-      <ConfirmDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title={`${RECOMMENDATION_ACTION_LABELS_DE[rec.action]} ausführen`}
-        description="Prüfen Sie, was genau an Meta gesendet würde. Es wird nichts ausgeführt, bevor Sie bestätigen."
-        confirmPhrase="AUSFÜHREN"
-        confirmLabel="An Meta senden"
-        tone="destructive"
-        pending={action.pending}
-        preview={
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-foreground">{view.actionSummaryDe}</p>
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
-              Nutzlast
-            </p>
-            <pre className="max-h-60 overflow-auto rounded-md bg-surface-sunken px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
-              {JSON.stringify(view.requestPreview, null, 2)}
-            </pre>
-          </div>
-        }
-        onConfirm={async () => {
-          await action.execute({ campaignId, recommendationId: rec.id });
-          setDialogOpen(false);
-        }}
-      />
+      {touchesMeta ? (
+        <ConfirmDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          title={`${RECOMMENDATION_ACTION_LABELS_DE[rec.action]} ausführen`}
+          description="Prüfen Sie, was genau an Meta gesendet würde. Es wird nichts ausgeführt, bevor Sie bestätigen."
+          confirmPhrase="AUSFÜHREN"
+          confirmLabel="An Meta senden"
+          tone="destructive"
+          pending={action.pending}
+          preview={
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-foreground">{current.actionSummaryDe}</p>
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                Nutzlast
+              </p>
+              <pre className="max-h-60 overflow-auto rounded-md bg-surface-sunken px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
+                {JSON.stringify(current.requestPreview, null, 2)}
+              </pre>
+            </div>
+          }
+          onConfirm={async () => {
+            await action.execute({ campaignId, recommendationId: rec.id });
+            setDialogOpen(false);
+          }}
+        />
+      ) : null}
     </article>
   );
 }

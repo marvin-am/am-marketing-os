@@ -22,6 +22,12 @@
 /* -------------------------------------------------------------------------- */
 export { cn, type ClassValue } from './lib/cn';
 export {
+  metricBasisDe,
+  noDenominatorNoteDe,
+  rateBasisDe,
+  type BasisNouns,
+} from './lib/metric-basis';
+export {
   formatCountDe,
   formatDateDe,
   formatDateTimeDe,

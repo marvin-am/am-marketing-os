@@ -1,19 +1,7 @@
 import * as React from 'react';
 import { type MetricKey, type MetricValue } from '@am/domain';
-import {
-  AttributionCoverageBadge,
-  DataMaturityBadge,
-  EmptyState,
-  formatMetricValueDe,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@am/ui';
+import { AttributionCoverageBadge, DataMaturityBadge, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, formatMetricValueDe, metricBasisDe } from '@am/ui';
 import type { BreakdownRow } from '@/server/analytics-port';
-import { metricBasisDe } from './metric-basis';
 
 const METRIC_LABELS: Readonly<Record<MetricKey, string>> = {
   impressions: 'Impressionen',

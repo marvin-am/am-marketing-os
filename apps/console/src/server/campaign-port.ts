@@ -318,11 +318,27 @@ export interface TestPlanView {
 /* Tab 5 — Launch-QA                                                           */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The exact request one publishing step would send to Meta.
+ *
+ * The confirmation dialog and the port read the same object, so what the
+ * operator approves and what the adapter would send cannot drift apart.
+ */
+export interface MetaWritePreview {
+  /** The campaign state this step would enter. */
+  to: CampaignState;
+  /** Adapter operation, e.g. `meta.create_paused_draft_campaign`. */
+  operation: string;
+  payload: Record<string, unknown>;
+}
+
 export interface LaunchQaView {
   campaignId: string;
   report: LaunchQaReport;
   /** Keys whose status is AWAITING_EXTERNAL_INPUT and gate only the live step. */
   awaitingLiveOnlyKeys: LaunchCheckKey[];
+  /** One entry per step on this screen that reaches Meta. */
+  metaWrites: MetaWritePreview[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -501,6 +517,21 @@ export interface RecommendationExecutionInput {
   actor: { id: string; displayName: string };
 }
 
+/**
+ * Deciding a recommendation without touching a provider.
+ *
+ * `ACCEPTED` and `DISMISSED` are states of *our* record — the operator's
+ * verdict on the proposal. They are how a recommendation that needs no external
+ * action leaves the board, and they never imply that anything was sent.
+ */
+export interface RecommendationDecisionInput {
+  campaignId: string;
+  recommendationId: string;
+  decision: 'ACCEPT' | 'DISMISS';
+  reasonDe?: string;
+  actor: { id: string; displayName: string };
+}
+
 export interface LeadSyncRetryInput {
   campaignId: string;
   leadId: string;
@@ -536,13 +567,26 @@ export interface CampaignPort {
   /* ---- writes ---- */
   decideApproval(input: ApprovalDecisionInput): Promise<ActionResult<ApprovalStatus>>;
   reviewCreative(input: CreativeReviewInput): Promise<ActionResult<CreativeBoardView>>;
+  /**
+   * Advances the business state. A step into a state that asserts a Meta object
+   * runs through the Meta write path and returns `dry_run` while writes are off
+   * — the state is not recorded on the strength of a local click.
+   */
   transition(input: TransitionInput): Promise<ActionResult<CampaignHeaderView>>;
-  /** Refuses out-of-limit changes naming the approving role; never clamps. */
+  /**
+   * Refuses out-of-limit changes naming the approving role; never clamps. Once
+   * the budget lives on a Meta object, changing it is an external write and
+   * returns `dry_run` while writes are off.
+   */
   changeBudget(input: BudgetChangeInput): Promise<ActionResult<CampaignHeaderView>>;
   /** Returns `dry_run` while external writes are off — never `ok`. */
   executeRecommendation(
     input: RecommendationExecutionInput,
   ): Promise<ActionResult<CommandOutcome>>;
+  /** Records the operator's verdict. Sends nothing, so it may return `ok`. */
+  decideRecommendation(
+    input: RecommendationDecisionInput,
+  ): Promise<ActionResult<RecommendationView>>;
   retryLeadSync(input: LeadSyncRetryInput): Promise<ActionResult<LeadRow>>;
 }
 

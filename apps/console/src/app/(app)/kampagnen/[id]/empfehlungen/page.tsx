@@ -2,7 +2,7 @@ import { RecommendationList } from '@/components/campaign/recommendation-card';
 import { requireUser } from '@/lib/action';
 import { can } from '@/lib/permissions';
 import { getCampaignPort } from '@/server/campaign-fixtures';
-import { executeRecommendation } from '../actions';
+import { decideRecommendation, executeRecommendation } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +16,7 @@ export default async function EmpfehlungenPage({ params }: { params: Promise<{ i
       views={views}
       canExecute={can(user, 'recommendation.execute')}
       execute={executeRecommendation}
+      decide={decideRecommendation}
     />
   );
 }

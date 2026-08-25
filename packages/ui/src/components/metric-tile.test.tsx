@@ -70,7 +70,7 @@ describe('MetricTile', () => {
   it('takes metric, maturity and coverage from a MetricValue envelope', () => {
     const metricValue: MetricValue = {
       metric: 'revenue',
-      numerator: 3,
+      numerator: 1_250_00,
       denominator: 12,
       value: 1_250_00,
       currency: 'EUR',
@@ -82,9 +82,32 @@ describe('MetricTile', () => {
 
     // Intl separates the amount from the currency with a non-breaking space.
     expect(valueOf(container)).toBe('1.250,00\u00A0€');
-    expect(basisOf(container)).toContain('3 / 12');
+    expect(basisOf(container)).toContain('1.250,00\u00A0€');
     expect(screen.getByText('Reif')).toBeInTheDocument();
     expect(screen.getByText('92 %')).toBeInTheDocument();
+  });
+
+  it('renders a money numerator as money, and names both sides', () => {
+    /* A CPL of 11,47 € was annotated "158.264 / 138" — the spend in minor
+       units, unlabelled, reading as 158 thousand of something. Each side is
+       formatted in its own unit and named. */
+    const cpl: MetricValue = {
+      metric: 'cpl',
+      numerator: 1_582_64,
+      denominator: 138,
+      value: 11_47,
+      currency: 'EUR',
+      maturity: 'MATURE',
+      attributionCoverage: null,
+    };
+
+    const { container } = render(<MetricTile value={cpl} />);
+
+    expect(valueOf(container)).toBe('11,47\u00A0€');
+    expect(basisOf(container)).toContain('1.582,64');
+    expect(basisOf(container)).toContain('Spend');
+    expect(basisOf(container)).toContain('138 Leads');
+    expect(basisOf(container)).not.toMatch(/\b158264\b/);
   });
 
   it('compares against a target and names the direction in words', () => {

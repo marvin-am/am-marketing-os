@@ -34,11 +34,13 @@ import {
   type LearningCard,
   type MetricKey,
   type MetricValue,
+  type RecommendationState,
   type Role,
 } from '@am/domain';
 import { getFeatureFlags } from '@am/config';
+import { draftNameWithMarker } from '@am/meta';
 import { FIXTURE_IDS } from '@am/funnel-schema';
-import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
+import { actionDryRun, actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { rolesWithPermission, ROLE_LABELS_DE } from '@/lib/permissions';
 import type {
   ApprovalDecisionInput,
@@ -65,11 +67,13 @@ import type {
   LeadSyncRetryInput,
   LeadsSalesView,
   LivePerformanceView,
+  MetaWritePreview,
   MoneyAmount,
   NextRequiredAction,
   PerformanceBreakdownRow,
   PerformancePoint,
   ProviderSyncStatus,
+  RecommendationDecisionInput,
   RecommendationExecutionInput,
   RecommendationView,
   StrategyView,
@@ -97,7 +101,8 @@ import { campaignTabHref } from './campaign-port';
  * - a budget change beyond a role's authority is **refused** with the approving
  *   role named — never clamped,
  * - a Meta write with `EXTERNAL_WRITES_ENABLED=false` returns a `DryRunResult`,
- *   never a success.
+ *   never a success — including the step into a state whose very name claims a
+ *   Meta object exists, which is therefore not recorded either.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -541,6 +546,8 @@ interface CampaignRecord {
   audit: AuditLog[];
   commands: Map<string, ExternalCommand>;
   leadSync: Map<string, { status: LeadRow['syncStatus']; attempts: number; error: string | null }>;
+  /** Operator verdicts, keyed by recommendation id. Purely our own record. */
+  recommendationDecisions: Map<string, { state: RecommendationState; reasonDe: string | null }>;
   updatedAt: string;
 }
 
@@ -660,6 +667,7 @@ function seedStore(): void {
       audit: buildAudit(id, spec),
       commands: buildCommands(id, spec),
       leadSync,
+      recommendationDecisions: new Map(),
       updatedAt: iso(-spec.updatedDaysAgo),
     });
   }
@@ -812,6 +820,17 @@ function buildAudit(id: string, spec: CampaignSpec): AuditLog[] {
   return rows.sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
 }
 
+/**
+ * Object ids belonging to the fixture dataset.
+ *
+ * They are the fixture's own data and never a claim that these objects exist in
+ * an ad account — nothing in this deployment is connected to Meta. They live
+ * here once so a preview, a payload and a command can never name different
+ * objects for the same action.
+ */
+const FIXTURE_META_CAMPAIGN_ID = '120214880031240500';
+const FIXTURE_META_AD_ID = '120214880031240521';
+
 function buildCommands(id: string, spec: CampaignSpec): Map<string, ExternalCommand> {
   const map = new Map<string, ExternalCommand>();
   if (!spec.hasPerformance) return map;
@@ -827,10 +846,10 @@ function buildCommands(id: string, spec: CampaignSpec): Map<string, ExternalComm
     confirmedAt: iso(-2, 1),
     reconciledAt: null,
     requestPreview: {
-      ad_id: '120214880031240521',
+      ad_id: FIXTURE_META_AD_ID,
       status: 'PAUSED',
     },
-    providerResponseRedacted: { success: true, id: '120214880031240521' },
+    providerResponseRedacted: { success: true, id: FIXTURE_META_AD_ID },
     error: null,
     attemptCount: 1,
     campaign_id: id,
@@ -858,6 +877,110 @@ export function realityOf(state: CampaignState, preview: boolean): CampaignReali
     default:
       return 'DRAFT';
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Meta-side writes                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The two state changes only Meta can make true.
+ *
+ * Entering `META_DRAFT_CREATED` means a campaign, its ad sets and its ads were
+ * created in the ad account; entering `LIVE` means they were resumed. Both are
+ * statements about the provider's records, so both go through the Meta write
+ * path — with writes disabled they produce a `DryRunResult` and the state is
+ * left untouched, because a state whose name asserts a Meta object may not rest
+ * on a local click (AGENTS.md rules 2 and 3).
+ *
+ * `SCHEDULED` is deliberately absent: it records a planned start next to a
+ * draft that was already created, and changes nothing over there.
+ */
+const META_WRITING_TRANSITIONS = {
+  META_DRAFT_CREATED: 'meta.create_paused_draft_campaign',
+  LIVE: 'meta.resume_entity',
+} as const satisfies Partial<Record<CampaignState, string>>;
+
+function isMetaWritingTransition(to: CampaignState): to is keyof typeof META_WRITING_TRANSITIONS {
+  return to in META_WRITING_TRANSITIONS;
+}
+
+/**
+ * Whether the daily budget of this campaign is a number in an ad account rather
+ * than a planning figure in our own record. From the paused draft onwards it is
+ * the former, so changing it is an external write.
+ */
+function budgetLivesAtMeta(state: CampaignState): boolean {
+  const reality = realityOf(state, false);
+  return reality === 'META_DRAFT_PAUSED' || reality === 'LIVE' || reality === 'PAUSED';
+}
+
+function draftIdempotencyKey(record: CampaignRecord): string {
+  return `campaign-draft-${record.spec.slug}`;
+}
+
+/**
+ * Exactly what creating the paused draft would send.
+ *
+ * Every object is `PAUSED`, and the ids that can only come from a connected ad
+ * account are `null` rather than filled in — an invented account, page or pixel
+ * id in a preview is a fabricated external fact even when nothing is sent.
+ */
+function draftRequestPayload(record: CampaignRecord): Record<string, unknown> {
+  const key = draftIdempotencyKey(record);
+  const name = `AM | ${record.spec.name}`;
+  return {
+    ad_account_id: null,
+    page_id: null,
+    pixel_id: null,
+    idempotency_key: key,
+    campaign: {
+      name: draftNameWithMarker(name, key),
+      objective: 'OUTCOME_LEADS',
+      status: 'PAUSED',
+      special_ad_categories: [],
+      daily_budget: record.dailyBudgetMinor,
+      currency: 'EUR',
+    },
+    ad_sets: FUNNEL_PROPOSALS.map((proposal) => ({
+      name: `${name} | ${proposal.name}`,
+      status: 'PAUSED',
+    })),
+    ads: approvedConceptKeys(record).map((key) => ({
+      name: `${name} | ${CONCEPTS.find((c) => c.key === key)?.name ?? key}`,
+      status: 'PAUSED',
+    })),
+  };
+}
+
+/** What each publishing step on the Launch-QA screen would send to Meta. */
+function metaWritePreviews(record: CampaignRecord): MetaWritePreview[] {
+  return [
+    {
+      to: 'META_DRAFT_CREATED',
+      operation: META_WRITING_TRANSITIONS.META_DRAFT_CREATED,
+      payload: draftRequestPayload(record),
+    },
+    {
+      to: 'LIVE',
+      operation: META_WRITING_TRANSITIONS.LIVE,
+      payload: {
+        campaign_id: FIXTURE_META_CAMPAIGN_ID,
+        status: 'ACTIVE',
+        daily_budget: record.dailyBudgetMinor,
+        currency: 'EUR',
+      },
+    },
+  ];
+}
+
+/** The payload a daily-budget change would send, in the shape Meta expects. */
+function budgetRequestPayload(newDailyBudgetMinor: number): Record<string, unknown> {
+  return {
+    campaign_id: FIXTURE_META_CAMPAIGN_ID,
+    daily_budget: newDailyBudgetMinor,
+    currency: 'EUR',
+  };
 }
 
 function approvalStatus(record: CampaignRecord, kind: ApprovalKind): ApprovalStatus {
@@ -1665,7 +1788,14 @@ function recommendationViews(record: CampaignRecord): RecommendationView[] {
     actionSummaryDe: 'Keine externe Aktion — der Arm läuft unverändert weiter.',
   });
 
-  return views;
+  // The operator's verdict is the last word on a recommendation's state, so it
+  // is applied after the rules produced them rather than woven into each one.
+  return views.map((view) => {
+    const decision = record.recommendationDecisions.get(view.recommendation.id);
+    return decision
+      ? { ...view, recommendation: { ...view.recommendation, state: decision.state } }
+      : view;
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2098,6 +2228,7 @@ class FixtureCampaignPort implements CampaignPort {
       awaitingLiveOnlyKeys: checks
         .filter((c) => c.status === 'AWAITING_EXTERNAL_INPUT' && c.blocksLiveOnly)
         .map((c) => c.key),
+      metaWrites: metaWritePreviews(record),
     };
   }
 
@@ -2272,6 +2403,29 @@ class FixtureCampaignPort implements CampaignPort {
       );
     }
 
+    // The step into a state that asserts a Meta object is an external write, so
+    // it takes the same route as the recommendation path: a dry run while
+    // writes are off, and the state stays where it was. Recording
+    // META_DRAFT_CREATED here would make the header claim a draft exists in an
+    // ad account nobody has connected.
+    if (isMetaWritingTransition(input.to)) {
+      if (!canWriteMeta(getFeatureFlags())) {
+        const preview = metaWritePreviews(record).find((write) => write.to === input.to);
+        return actionDryRun(
+          dryRun(
+            'META',
+            META_WRITING_TRANSITIONS[input.to],
+            preview?.payload ?? {},
+            'Meta-Schreibzugriffe sind deaktiviert (EXTERNAL_WRITES_ENABLED / META_MUTATIONS_ENABLED = false). Es wurde nichts angelegt und der Status wurde nicht geändert.',
+          ),
+        );
+      }
+      return actionError(
+        'PROVIDER_NOT_CONNECTED',
+        'Externe Schreibzugriffe sind aktiviert, aber es ist kein Meta-Werbekonto verbunden. Es wurde nichts gesendet und der Status wurde nicht geändert.',
+      );
+    }
+
     record.state = input.to;
     record.updatedAt = new Date().toISOString();
     return actionOk(headerOf(record, false));
@@ -2300,6 +2454,26 @@ class FixtureCampaignPort implements CampaignPort {
       return actionError(
         'BUDGET_LIMIT_EXCEEDED',
         `Diese Budgetänderung überschreitet Ihr Rollenlimit und wird nicht gekürzt, sondern abgelehnt. Sie muss durch die Rolle „${approver}" freigegeben werden.`,
+      );
+    }
+
+    // Once a Meta object carries the budget, changing it here changes nothing
+    // over there. Reporting success and showing the new figure in the header
+    // would tell the operator a live campaign spends an amount Meta has never
+    // been asked to deliver at.
+    if (budgetLivesAtMeta(record.state)) {
+      if (!canWriteMeta(getFeatureFlags())) {
+        return actionDryRun(
+          dryRun(
+            'META',
+            'campaign.update.daily_budget',
+            budgetRequestPayload(input.newDailyBudgetMinor),
+          ),
+        );
+      }
+      return actionError(
+        'PROVIDER_NOT_CONNECTED',
+        'Externe Schreibzugriffe sind aktiviert, aber es ist kein Meta-Werbekonto verbunden. Das Tagesbudget wurde nicht geändert.',
       );
     }
 
@@ -2337,6 +2511,44 @@ class FixtureCampaignPort implements CampaignPort {
       'PROVIDER_NOT_CONNECTED',
       'Externe Schreibzugriffe sind aktiviert, aber es ist kein Meta-Werbekonto verbunden. Es wurde nichts gesendet.',
     );
+  }
+
+  async decideRecommendation(
+    input: RecommendationDecisionInput,
+  ): Promise<ActionResult<RecommendationView>> {
+    const record = this.require(input.campaignId);
+    if (!record) return actionError('NOT_FOUND', 'Diese Kampagne existiert nicht.');
+
+    const find = () =>
+      recommendationViews(record).find((v) => v.recommendation.id === input.recommendationId);
+
+    const view = find();
+    if (!view) return actionError('NOT_FOUND', 'Diese Empfehlung gehört nicht zu dieser Kampagne.');
+    if (view.recommendation.state !== 'OPEN') {
+      return actionError(
+        'ALREADY_DECIDED',
+        'Über diese Empfehlung wurde bereits entschieden. Eine erneute Entscheidung ändert nichts.',
+      );
+    }
+    // Accepting a recommendation that does touch Meta would leave the operator
+    // believing the change is on its way. Those are accepted by executing them.
+    if (input.decision === 'ACCEPT' && view.recommendation.affectedMetaObjects.length > 0) {
+      return actionError(
+        'EXTERNAL_ACTION_REQUIRED',
+        'Diese Empfehlung verändert Objekte bei Meta. Sie wird über „Annehmen und ausführen" umgesetzt, nicht durch bloßes Annehmen.',
+      );
+    }
+
+    record.recommendationDecisions.set(input.recommendationId, {
+      state: input.decision === 'ACCEPT' ? 'ACCEPTED' : 'DISMISSED',
+      reasonDe: input.reasonDe?.trim() ? input.reasonDe.trim() : null,
+    });
+    record.updatedAt = new Date().toISOString();
+
+    const decided = find();
+    return decided
+      ? actionOk(decided)
+      : actionError('NOT_FOUND', 'Diese Empfehlung gehört nicht zu dieser Kampagne.');
   }
 
   async retryLeadSync(input: LeadSyncRetryInput): Promise<ActionResult<LeadRow>> {

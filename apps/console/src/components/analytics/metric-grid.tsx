@@ -1,8 +1,7 @@
 import * as React from 'react';
 import { METRIC_CATALOG, type MetricKey } from '@am/domain';
-import { MetricTile } from '@am/ui';
+import { MetricTile, metricBasisDe, noDenominatorNoteDe } from '@am/ui';
 import type { MetricSnapshot } from '@/server/analytics-port';
-import { metricBasisDe, noDenominatorNoteDe } from './metric-basis';
 
 export interface MetricGridProps {
   snapshot: MetricSnapshot;

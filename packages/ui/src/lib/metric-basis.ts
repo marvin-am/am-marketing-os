@@ -1,17 +1,22 @@
 import { METRIC_CATALOG, type MetricKey, type MetricValue, type Rate } from '@am/domain';
-import { formatCurrencyMinor, formatNumber } from '@/lib/format';
+import { formatCountDe, formatMoneyMinorDe } from './format';
 
 /**
- * The "12 / 340" line that sits under every number in the console.
+ * The "12 / 340" line that sits under every number.
  *
- * `MetricTile` renders numerator and denominator as plain counts, which is right
- * for a rate and wrong for a money-per-unit metric: a CPL whose numerator is
- * 1.305.465 minor units would read as 1,3 million of something. This module
- * formats each side in its own unit and names both, so the basis is legible
- * rather than merely present.
+ * Plain counts on both sides is right for a rate and wrong for a money-per-unit
+ * metric: a CPL of 11,47 € annotated "158.264 / 138" reads as 158 thousand of
+ * something. Each side is formatted in its own unit and both are named, so the
+ * basis is legible rather than merely present.
+ *
+ * It lives in the design system rather than in one app because it was written
+ * for the analytics dashboards and, while it sat there, the Campaign Room, the
+ * Heute board, the campaign table and the recommendation facts all went on
+ * printing raw minor units. `MetricTile` now applies it by default, so a
+ * surface gets the legible version without having to know it exists.
  */
 
-interface BasisNouns {
+export interface BasisNouns {
   numerator: string;
   denominator: string;
 }
@@ -43,7 +48,7 @@ function moneySides(metric: MetricKey): { numerator: boolean; denominator: boole
 }
 
 function side(value: number, isMoney: boolean, currency: string): string {
-  return isMoney ? formatCurrencyMinor(value, currency) : formatNumber(value);
+  return isMoney ? formatMoneyMinorDe(value, currency) : formatCountDe(value);
 }
 
 /**
@@ -67,8 +72,8 @@ export function metricBasisDe(value: MetricValue): string {
 
 /** The same line for a bare `Rate`, which is always a count over a count. */
 export function rateBasisDe(value: Rate, nouns?: BasisNouns): string {
-  const left = formatNumber(value.numerator);
-  const right = formatNumber(value.denominator);
+  const left = formatCountDe(value.numerator);
+  const right = formatCountDe(value.denominator);
   if (!nouns) return `${left} / ${right}`;
   return `${left} ${nouns.numerator} / ${right} ${nouns.denominator}`;
 }

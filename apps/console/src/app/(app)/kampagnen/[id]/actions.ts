@@ -21,6 +21,7 @@ import type {
   CommandOutcome,
   CreativeBoardView,
   LeadRow,
+  RecommendationView,
 } from '@/server/campaign-port';
 
 /**
@@ -264,6 +265,20 @@ async function guardedTransition(
     });
     revalidateCampaign(input.campaignId);
   }
+
+  // A step that would have reached Meta is worth a trail even though nothing
+  // was sent and the state did not move — the operator pressed the button.
+  if (result.status === 'dry_run') {
+    await ctx.audit({
+      action: 'meta.command_requested',
+      entityType: 'campaign',
+      entityId: input.campaignId,
+      campaignId: input.campaignId,
+      summaryDe: `Schritt nach „${CAMPAIGN_STATE_LABELS_DE[input.to]}" als Dry-Run ausgewertet — es wurde nichts an Meta gesendet und der Status blieb „${CAMPAIGN_STATE_LABELS_DE[header.state]}".`,
+      before: { state: header.state },
+      after: { state: header.state, operation: result.dryRun.operation },
+    });
+  }
   return result;
 }
 
@@ -332,6 +347,23 @@ export const changeDailyBudget = defineAction<BudgetChangeFormInput, CampaignHea
       });
       revalidateCampaign(input.campaignId);
     }
+
+    if (result.status === 'dry_run') {
+      await ctx.audit({
+        action: 'meta.command_requested',
+        entityType: 'campaign_budget',
+        entityId: input.campaignId,
+        campaignId: input.campaignId,
+        summaryDe:
+          'Budgetänderung als Dry-Run ausgewertet — es wurde nichts an Meta gesendet und das Tagesbudget blieb unverändert.',
+        before: { dailyBudgetMinor: header.budget.amountMinor },
+        after: {
+          requestedDailyBudgetMinor: input.newDailyBudgetMinor,
+          reasonDe: input.reasonDe,
+          operation: result.dryRun.operation,
+        },
+      });
+    }
     return result;
   },
 );
@@ -388,6 +420,50 @@ export const executeRecommendation = defineAction<
       after: { result: result.status },
     });
     revalidateCampaign(input.campaignId);
+    return result;
+  },
+);
+
+export interface RecommendationDecisionFormInput {
+  campaignId: string;
+  recommendationId: string;
+  decision: 'ACCEPT' | 'DISMISS';
+  reasonDe?: string;
+}
+
+/**
+ * Records the operator's verdict on a recommendation.
+ *
+ * Nothing here reaches a provider: `ACCEPTED` and `DISMISSED` are states of our
+ * own record, which is why this is the only way a recommendation that needs no
+ * external action can leave the board — and why it may report plain success.
+ */
+export const decideRecommendation = defineAction<
+  RecommendationDecisionFormInput,
+  RecommendationView
+>(
+  { permission: 'recommendation.execute', name: 'campaign.recommendation.decide' },
+  async (input, ctx) => {
+    const result = await getCampaignPort().decideRecommendation({
+      ...input,
+      actor: { id: ctx.user.id, displayName: ctx.user.displayName },
+    });
+
+    if (result.status === 'ok') {
+      await ctx.audit({
+        action: input.decision === 'ACCEPT' ? 'recommendation.accepted' : 'recommendation.dismissed',
+        entityType: 'recommendation',
+        entityId: input.recommendationId,
+        campaignId: input.campaignId,
+        summaryDe:
+          input.decision === 'ACCEPT'
+            ? 'Empfehlung angenommen — sie erfordert keine externe Aktion.'
+            : 'Empfehlung verworfen.',
+        before: { state: 'OPEN' },
+        after: { state: result.data.recommendation.state, reasonDe: input.reasonDe ?? null },
+      });
+      revalidateCampaign(input.campaignId);
+    }
     return result;
   },
 );

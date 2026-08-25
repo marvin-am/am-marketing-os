@@ -5,6 +5,7 @@ import { dryRun, nowIso, type Provider, type ProviderHealth } from '@am/domain';
 import type { HubspotMappingDocument, MappingWizardStepKey, TestLeadResult } from '@am/hubspot';
 import { actionDryRun, actionError } from '@/lib/action-result';
 import { defineAction } from '@/lib/action';
+import { testLeadActionResult } from '@/components/integrations/test-lead-outcome';
 import type {
   HubspotMappingSnapshot,
   OutboxRetryOutcome,
@@ -174,11 +175,14 @@ export const runTestLeadAction = defineAction<{ confirm: true }, TestLeadResult>
       action: 'hubspot.test_lead_sent',
       entityType: 'hubspot_test_lead',
       entityId: result.startedAt,
-      summaryDe: `Test-Lead ausgeführt: ${result.status}.`,
+      summaryDe:
+        result.status === 'PASS'
+          ? 'Test-Lead ausgeführt und in HubSpot nachgewiesen.'
+          : `Test-Lead nicht ausgeführt: ${result.status}.`,
       after: { status: result.status, gatePassed: result.gatePassed },
     });
     revalidatePath('/integrationen/hubspot');
-    return result;
+    return testLeadActionResult(result);
   },
 );
 

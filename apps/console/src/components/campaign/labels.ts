@@ -1,11 +1,12 @@
 import type {
   AttributionLevel,
   ConfidenceLabel,
+  ConnectionState,
   CreativePrinciple,
   FunnelKind,
   VqStatus,
 } from '@am/domain';
-import type { CampaignReality } from '@/server/campaign-port';
+import type { CampaignReality, ProviderSyncStatus } from '@/server/campaign-port';
 
 /**
  * German vocabulary that belongs to the Campaign Room specifically. Anything
@@ -21,9 +22,35 @@ export interface RealityDescriptor {
 }
 
 /**
+ * The three realities whose wording is a statement about *Meta's* records
+ * rather than ours.
+ *
+ * `PREVIEW`, `DRAFT` and `ENDED` describe our own documents and are true
+ * whatever the provider does. The other three assert that an object exists in
+ * an ad account, is delivering, or was paused there — none of which the console
+ * can know from its own state machine. Saying them requires a command in
+ * `PROVIDER_CONFIRMED` / `RECONCILED` behind a real connection; without one the
+ * console says what it requested, never what exists over there.
+ */
+export const PROVIDER_ASSERTING_REALITIES: readonly CampaignReality[] = [
+  'META_DRAFT_PAUSED',
+  'LIVE',
+  'PAUSED',
+];
+
+export function assertsProviderFact(reality: CampaignReality): boolean {
+  return PROVIDER_ASSERTING_REALITIES.includes(reality);
+}
+
+/**
  * Preview, an internal draft, the paused Meta draft and a delivering campaign
  * must never be confusable. Each carries its own word, its own sentence and its
  * own visual treatment — colour is never the only difference.
+ *
+ * These are the descriptors that hold **without** a provider confirmation, so
+ * anything rendering a reality without knowing the provider's answer is honest
+ * by default. `REALITY_PROVIDER_CONFIRMED` carries the stronger wording, and
+ * `realityDescriptor` is the only way to reach it.
  */
 export const REALITY: Readonly<Record<CampaignReality, RealityDescriptor>> = {
   PREVIEW: {
@@ -38,6 +65,40 @@ export const REALITY: Readonly<Record<CampaignReality, RealityDescriptor>> = {
       'Interner Entwurf. Es existiert kein Meta-Objekt zu dieser Kampagne und es wird nichts ausgeliefert.',
     tone: 'draft',
   },
+  META_DRAFT_PAUSED: {
+    labelDe: 'Meta-Entwurf – von Meta nicht bestätigt',
+    explanationDe:
+      'Der pausierte Entwurf ist angefordert, aber von Meta nicht bestätigt. Ob dort ein Objekt existiert, ist damit offen; er liefert nichts aus und verbraucht kein Budget.',
+    tone: 'paused-draft',
+  },
+  LIVE: {
+    labelDe: 'Live – von Meta nicht bestätigt',
+    explanationDe:
+      'Diese Kampagne ist bei uns als live geführt. Meta hat die Auslieferung nicht bestätigt, deshalb sagt diese Ansicht nicht, dass dort ausgeliefert wird.',
+    tone: 'live',
+  },
+  PAUSED: {
+    labelDe: 'Pausiert – von Meta nicht bestätigt',
+    explanationDe:
+      'Die Kampagne ist bei uns als pausiert geführt. Meta hat die Pausierung nicht bestätigt; die bisherigen Ergebnisse bleiben erhalten.',
+    tone: 'paused',
+  },
+  ENDED: {
+    labelDe: 'Abgeschlossen',
+    explanationDe:
+      'Die Kampagne ist beendet. Die Zahlen sind final, es wird nichts mehr ausgeliefert.',
+    tone: 'ended',
+  },
+};
+
+/**
+ * The wording that may only be shown once the provider has actually confirmed.
+ * Reachable exclusively through `realityDescriptor`, so it cannot be rendered
+ * by accident.
+ */
+export const REALITY_PROVIDER_CONFIRMED: Readonly<
+  Partial<Record<CampaignReality, RealityDescriptor>>
+> = {
   META_DRAFT_PAUSED: {
     labelDe: 'Meta-Entwurf – pausiert',
     explanationDe:
@@ -56,13 +117,35 @@ export const REALITY: Readonly<Record<CampaignReality, RealityDescriptor>> = {
       'Die Kampagne war live und ist pausiert. Es wird nichts ausgeliefert; die bisherigen Ergebnisse bleiben erhalten.',
     tone: 'paused',
   },
-  ENDED: {
-    labelDe: 'Abgeschlossen',
-    explanationDe:
-      'Die Kampagne ist beendet. Die Zahlen sind final, es wird nichts mehr ausgeliefert.',
-    tone: 'ended',
-  },
 };
+
+/**
+ * The descriptor to render. `providerConfirmed` must come from the provider —
+ * never from the campaign's own state, which is exactly the thing in question.
+ */
+export function realityDescriptor(
+  reality: CampaignReality,
+  providerConfirmed: boolean,
+): RealityDescriptor {
+  if (!providerConfirmed) return REALITY[reality];
+  return REALITY_PROVIDER_CONFIRMED[reality] ?? REALITY[reality];
+}
+
+/** The only connection state in which Meta can attest to anything. */
+const CONFIRMING_CONNECTION: ConnectionState = 'CONNECTED';
+
+/**
+ * Whether this campaign's Meta-side claims may be stated as facts.
+ *
+ * `FIXTURE` and `NOT_CONFIGURED` are explicitly not a connection, and a failing
+ * or degraded one has just told us its picture of the ad account is unreliable.
+ * This is what keeps the header from claiming a draft exists while the
+ * provider-sync panel beside it reports that no access token is configured.
+ */
+export function metaFactsConfirmed(providerSync: readonly ProviderSyncStatus[]): boolean {
+  const meta = providerSync.find((sync) => sync.provider === 'META');
+  return meta?.connection === CONFIRMING_CONNECTION && meta.health === 'PASS';
+}
 
 /** Border + background treatment per reality. Read together with the label. */
 export const REALITY_SURFACE: Readonly<Record<CampaignReality, string>> = {

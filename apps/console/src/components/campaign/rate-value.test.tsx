@@ -46,7 +46,7 @@ describe('MetricValueInline', () => {
     render(<MetricValueInline value={value} />);
 
     expect(screen.getByText('3,5 %')).toBeInTheDocument();
-    expect(screen.getByText(/12 \/ 340/)).toBeInTheDocument();
+    expect(screen.getByText(/12 Leads \/ 340 Sessions/)).toBeInTheDocument();
     expect(screen.getByText('Teilweise reif')).toBeInTheDocument();
   });
 
@@ -64,6 +64,26 @@ describe('MetricValueInline', () => {
     render(<MetricValueInline value={value} />);
 
     expect(screen.getByText('–')).toBeInTheDocument();
-    expect(screen.getByText(/kein Nenner, daher –/)).toBeInTheDocument();
+    // The note names which denominator is missing, so the dash is explainable
+    // without going back to the formula.
+    expect(screen.getByText(/Kein Nenner: Leads = 0/)).toBeInTheDocument();
+  });
+
+  it('renders a money numerator as money rather than as a bare count', () => {
+    /* "Kosten je qualifiziertem VQ 52,75 €" was annotated "158.264 / 30". */
+    const value: MetricValue = {
+      metric: 'cost_per_qualified_vq',
+      numerator: 1_582_64,
+      denominator: 30,
+      value: 52_75,
+      currency: 'EUR',
+      maturity: 'MATURE',
+      attributionCoverage: null,
+    };
+
+    render(<MetricValueInline value={value} />);
+
+    expect(screen.getByText(/1\.582,64/)).toBeInTheDocument();
+    expect(screen.getByText(/30 qualifizierte VQs/)).toBeInTheDocument();
   });
 });

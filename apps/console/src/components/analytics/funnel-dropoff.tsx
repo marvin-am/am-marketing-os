@@ -1,22 +1,8 @@
 import * as React from 'react';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  EmptyState,
-  MetricTile,
-  Section,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@am/ui';
+import { Alert, AlertDescription, AlertTitle, EmptyState, MetricTile, Section, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, rateBasisDe } from '@am/ui';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { FunnelDropOff } from '@/server/analytics-port';
 import { FunnelStepChart } from './funnel-step-chart';
-import { rateBasisDe } from './metric-basis';
 
 export interface FunnelDropOffViewProps {
   dropOff: FunnelDropOff;

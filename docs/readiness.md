@@ -109,11 +109,11 @@ Whoever holds the specification should paste the missing text into this table.
 | 16 | *text not in this repository* | ungradeable | — |
 | 17 | *text not in this repository* | ungradeable | — |
 | 18 | *text not in this repository* | ungradeable | — |
-| 19 | every rate shows numerator and denominator | partial — the zero-denominator `–` rule holds; money numerators render as raw minor units in the Campaign Room, the Heute board and the campaign table | `@am/domain` `Rate`, `MetricTile` |
+| 19 | every rate shows numerator and denominator | met, exercised in the product | `@am/domain` `Rate`, `MetricTile`, `metricBasisDe` — each side in its own unit, both named |
 | 20 | data maturity and CRM delay are visible | met, exercised in the product | `MetricTile`, dashboards |
 | 21 | *text not in this repository* | ungradeable | — |
 | 22 | pause and scale require confirmation | scale met; **pause has no control at all** — `pauseCampaign` is imported by no UI file | `ConfirmDialog` + command lifecycle |
-| 23 | Meta success only after provider confirmation | met on the recommendation path; **not met** for "Pausierten Meta-Entwurf erstellen", which asserts a Meta-side draft with no confirmation and no dry run | `@am/meta` commands |
+| 23 | Meta success only after provider confirmation | met, exercised in the product | `@am/meta` commands. The paused-draft transition runs the same confirm-plus-dry-run path as the recommendations, and a state whose name is a claim about Meta's records renders as unconfirmed until the provider says otherwise |
 | 24 | role limits block unauthorised increases | met, exercised in the product | `evaluateBudgetChange`, re-checked server-side |
 | 25 | changes invalidate approvals | met, exercised in the product | content-hash approvals |
 | 26 | audit log records generations, approvals, state changes | met, exercised in the product | `/kampagnen/<id>/versionen` |

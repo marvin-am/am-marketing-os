@@ -2,7 +2,15 @@
 
 import * as React from 'react';
 import type { DataMaturity, MetricKey, MetricValue, Rate } from '@am/domain';
-import { cn, DataMaturityBadge, formatMetricValueDe, formatPercentDe, NO_VALUE } from '@am/ui';
+import {
+  cn,
+  DataMaturityBadge,
+  formatMetricValueDe,
+  formatPercentDe,
+  metricBasisDe,
+  noDenominatorNoteDe,
+  NO_VALUE,
+} from '@am/ui';
 import { formatNumber } from '@/lib/format';
 
 /**
@@ -67,10 +75,11 @@ export function MetricValueInline({
   ...props
 }: MetricValueInlineProps) {
   const display = formatMetricValueDe(value.metric, value.value, value.currency, 'minor');
+  /* Each side in its own unit and both named: a CPL of 11,47 € annotated
+     "158.264 / 138" reads as 158 thousand of something. */
   const basis =
-    value.numerator !== null && value.denominator !== null
-      ? `${formatNumber(value.numerator)} / ${formatNumber(value.denominator)}`
-      : null;
+    value.numerator !== null && value.denominator !== null ? metricBasisDe(value) : null;
+  const noDenominatorNote = noDenominatorNoteDe(value);
 
   return (
     <span
@@ -84,7 +93,7 @@ export function MetricValueInline({
       {basis ? (
         <span data-am-rate-basis="" className="text-xs tabular-nums text-muted-foreground">
           {basis}
-          {value.value === null ? ` – kein Nenner, daher ${NO_VALUE}` : ''}
+          {value.value === null ? ` ${noDenominatorNote ?? `– kein Nenner, daher ${NO_VALUE}`}` : ''}
         </span>
       ) : null}
       {withMaturity ? <MaturityChip maturity={value.maturity} /> : null}

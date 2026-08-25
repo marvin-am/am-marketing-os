@@ -62,6 +62,30 @@ const VIEW: RecommendationView = {
   actionSummaryDe: 'Setzt die Anzeige „AM | Potenzialanalyse" bei Meta auf PAUSED.',
 };
 
+/** A recommendation the rules emit that asks for nothing to be sent anywhere. */
+const NO_ACTION_VIEW: RecommendationView = {
+  recommendation: {
+    ...RECOMMENDATION,
+    id: '8a1f6d92-4b30-4c8e-9a51-2f7c3e5d0a14',
+    action: 'COLLECT_MORE_DATA',
+    ruleId: 'COLLECT_MORE_DATA',
+    titleDe: 'Funnelarm „Landingpage mit Direktkontakt" weiterlaufen lassen',
+    summaryDe: 'Der Arm hat das Mindestvolumen je Arm noch nicht erreicht.',
+    affectedMetaObjects: [],
+  },
+  command: null,
+  lastDryRun: null,
+  requestPreview: {},
+  actionSummaryDe: 'Keine externe Aktion — der Arm läuft unverändert weiter.',
+};
+
+const noopDecide = async (): Promise<ActionResult<RecommendationView>> => ({
+  status: 'error',
+  code: 'NOT_CALLED',
+  messageDe: 'In diesem Test wird keine Entscheidung erwartet.',
+  retryable: false,
+});
+
 function confirmedCommand(state: ExternalCommand['state']): ExternalCommand {
   return {
     id: '3b8d1f60-2c55-4e17-9a83-6d1c4f0e7b92',
@@ -84,7 +108,13 @@ function confirmedCommand(state: ExternalCommand['state']): ExternalCommand {
 describe('RecommendationCard', () => {
   it('renders each fact with its numerator, denominator and comparison basis', () => {
     render(
-      <RecommendationCard campaignId={CAMPAIGN_ID} view={VIEW} canExecute execute={vi.fn()} />,
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={VIEW}
+        canExecute
+        execute={vi.fn()}
+        decide={noopDecide}
+      />,
     );
 
     const fact = document.querySelector('[data-fact-metric="submission_rate"]');
@@ -112,7 +142,13 @@ describe('RecommendationCard', () => {
     );
 
     render(
-      <RecommendationCard campaignId={CAMPAIGN_ID} view={VIEW} canExecute execute={execute} />,
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={VIEW}
+        canExecute
+        execute={execute}
+        decide={noopDecide}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Annehmen und ausführen' }));
@@ -144,7 +180,13 @@ describe('RecommendationCard', () => {
     const execute = vi.fn();
 
     render(
-      <RecommendationCard campaignId={CAMPAIGN_ID} view={VIEW} canExecute execute={execute} />,
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={VIEW}
+        canExecute
+        execute={execute}
+        decide={noopDecide}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Annehmen und ausführen' }));
@@ -168,7 +210,13 @@ describe('RecommendationCard', () => {
     );
 
     render(
-      <RecommendationCard campaignId={CAMPAIGN_ID} view={VIEW} canExecute execute={execute} />,
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={VIEW}
+        canExecute
+        execute={execute}
+        decide={noopDecide}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Annehmen und ausführen' }));
@@ -199,6 +247,7 @@ describe('RecommendationCard', () => {
         }}
         canExecute
         execute={vi.fn()}
+        decide={noopDecide}
       />,
     );
 
@@ -217,6 +266,7 @@ describe('RecommendationCard', () => {
         }}
         canExecute
         execute={vi.fn()}
+        decide={noopDecide}
       />,
     );
 
@@ -234,6 +284,7 @@ describe('RecommendationCard', () => {
         view={VIEW}
         canExecute={false}
         execute={vi.fn()}
+        decide={noopDecide}
       />,
     );
 
@@ -241,5 +292,101 @@ describe('RecommendationCard', () => {
       screen.queryByRole('button', { name: 'Annehmen und ausführen' }),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Ihre Rolle darf Empfehlungen nicht ausführen/)).toBeInTheDocument();
+  });
+});
+
+describe('a recommendation that changes nothing at Meta', () => {
+  /**
+   * Its payload is empty and the server refuses to execute it, so a dialog
+   * promising to send it to Meta offers a button that can never succeed.
+   */
+  it('is never offered a send-to-Meta dialog', async () => {
+    const user = userEvent.setup();
+    const execute = vi.fn();
+
+    render(
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={NO_ACTION_VIEW}
+        canExecute
+        execute={execute}
+        decide={noopDecide}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Annehmen und ausführen' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Keine — diese Empfehlung verändert nichts bei Meta.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Annehmen' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'An Meta senden' })).not.toBeInTheDocument();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  /** Without these two controls the item stays OPEN forever. */
+  it('can be accepted and can be dismissed, and says nothing was sent', async () => {
+    const user = userEvent.setup();
+    const decide = vi.fn(
+      async (input: {
+        campaignId: string;
+        recommendationId: string;
+        decision: 'ACCEPT' | 'DISMISS';
+      }): Promise<ActionResult<RecommendationView>> =>
+        actionOk<RecommendationView>({
+          ...NO_ACTION_VIEW,
+          recommendation: {
+            ...NO_ACTION_VIEW.recommendation,
+            state: input.decision === 'ACCEPT' ? 'ACCEPTED' : 'DISMISSED',
+          },
+        }),
+    );
+
+    const { unmount } = render(
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={NO_ACTION_VIEW}
+        canExecute
+        execute={vi.fn()}
+        decide={decide}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Annehmen' }));
+    await waitFor(() =>
+      expect(decide).toHaveBeenCalledWith({
+        campaignId: CAMPAIGN_ID,
+        recommendationId: NO_ACTION_VIEW.recommendation.id,
+        decision: 'ACCEPT',
+      }),
+    );
+    expect(
+      await screen.findByText('Empfehlung entschieden. Es wurde nichts an Meta gesendet.'),
+    ).toBeInTheDocument();
+    // The decided card stops offering controls it no longer has.
+    expect(screen.queryByRole('button', { name: 'Annehmen' })).not.toBeInTheDocument();
+    unmount();
+
+    decide.mockClear();
+    render(
+      <RecommendationCard
+        campaignId={CAMPAIGN_ID}
+        view={NO_ACTION_VIEW}
+        canExecute
+        execute={vi.fn()}
+        decide={decide}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    await waitFor(() =>
+      expect(decide).toHaveBeenCalledWith({
+        campaignId: CAMPAIGN_ID,
+        recommendationId: NO_ACTION_VIEW.recommendation.id,
+        decision: 'DISMISS',
+      }),
+    );
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).not.toBeInTheDocument();
   });
 });
