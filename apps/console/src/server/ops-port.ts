@@ -169,7 +169,8 @@ export interface LibraryCreative {
   renditions: CreativeRendition[];
   performance: CreativePerformance;
   claims: LibraryClaim[];
-  href: string;
+  /** Detail route, once one exists. Null renders as plain text, never a dead link. */
+  href: string | null;
 }
 
 export interface LibraryAngleVersion {
@@ -186,7 +187,7 @@ export interface LibraryAngle {
   audienceDe: string;
   versions: LibraryAngleVersion[];
   usedInCampaigns: number;
-  href: string;
+  href: string | null;
 }
 
 export interface LibraryOffer {
@@ -196,7 +197,7 @@ export interface LibraryOffer {
   promiseDe: string;
   effortPromiseDe: string | null;
   usedInCampaigns: number;
-  href: string;
+  href: string | null;
 }
 
 export interface LibraryCaseStudy {
@@ -247,7 +248,7 @@ export interface LibraryHistoricalCampaign {
   outcomeDe: string;
   angleNameDe: string | null;
   offerNameDe: string | null;
-  href: string;
+  href: string | null;
 }
 
 export interface LibrarySnapshot {

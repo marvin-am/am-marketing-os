@@ -34,6 +34,17 @@ export default defineConfig({
           setupFiles: ['./vitest.setup.ts'],
           include: ['packages/*/src/**/*.test.tsx', 'apps/*/src/**/*.test.tsx'],
           exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
+          /**
+           * The builder tests drive genuine multi-step interactions —
+           * add a step, reorder it, fill a branch, land on a result — and
+           * `userEvent` waits for real timers between each one. Vitest's 5 s
+           * default is comfortable in isolation and too tight once the whole
+           * suite is competing for four cores, which produced tests that
+           * passed alone and failed together. A test that only passes on an
+           * idle machine is not a gate, so the budget matches the work.
+           */
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
       {

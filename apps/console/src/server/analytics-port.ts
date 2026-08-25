@@ -176,6 +176,12 @@ export interface ExperimentSummary {
   arms: ExperimentArm[];
   /** The full evaluation from `evaluateExperiment` — verdict, reasons, warnings. */
   evaluation: ExperimentEvaluation;
+  /**
+   * The raw per-arm observations the evaluation was computed from. Carried on
+   * the summary too, because "what is still missing and by how much" cannot be
+   * stated without the arms' session counts.
+   */
+  observations: ArmObservation[];
   campaignId: string;
   campaignLabelDe: string;
   /** German label of the winning arm, or null when there is no winner. */
@@ -183,8 +189,6 @@ export interface ExperimentSummary {
 }
 
 export interface ExperimentDetail extends ExperimentSummary {
-  /** The raw per-arm observations the evaluation was computed from. */
-  observations: ArmObservation[];
   /** Per-arm metric envelopes, keyed by arm id. Same catalogue as everywhere. */
   armMetrics: Record<string, MetricSnapshot>;
 }

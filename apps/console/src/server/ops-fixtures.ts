@@ -43,6 +43,7 @@ import {
   getMetaCredentials,
   runMetaHealthChecks,
 } from '@am/meta';
+import { FIXTURE_CAMPAIGN_IDS } from './campaign-fixtures';
 import {
   META_WIZARD_STEP_KEYS,
   type ApprovalThresholds,
@@ -92,6 +93,46 @@ const FIXTURE_ANCHOR = '2026-08-25T07:30:00.000Z';
 
 function iso(offsetMinutes: number): string {
   return new Date(Date.parse(FIXTURE_ANCHOR) + offsetMinutes * 60_000).toISOString();
+}
+
+/**
+ * The Heute page deep-links into the Campaign Room, so it addresses the same
+ * fixture campaigns the campaign area serves rather than inventing ids of its
+ * own — otherwise every link on the daily start page would end in a 404.
+ */
+const CAMPAIGNS = {
+  live: {
+    id: FIXTURE_CAMPAIGN_IDS.live,
+    nameDe: 'Potenzialanalyse Handwerk — Q3',
+  },
+  metaDraft: {
+    id: FIXTURE_CAMPAIGN_IDS.metaDraft,
+    nameDe: 'Benchmark Metallbau — Pilot',
+  },
+  assetReview: {
+    id: FIXTURE_CAMPAIGN_IDS.assetReview,
+    nameDe: 'Auslastungslücke Elektro — Test 2',
+  },
+  strategyReview: {
+    id: FIXTURE_CAMPAIGN_IDS.strategyReview,
+    nameDe: 'Nachfolge im Handwerk — Idee',
+  },
+  paused: {
+    id: FIXTURE_CAMPAIGN_IDS.paused,
+    nameDe: 'Sanitär Notdienst — Sommerwelle',
+  },
+  completed: {
+    id: FIXTURE_CAMPAIGN_IDS.completed,
+    nameDe: 'Dachsanierung Förderung — Q2',
+  },
+  invalidatedApproval: {
+    id: FIXTURE_CAMPAIGN_IDS.invalidatedApproval,
+    nameDe: 'Fenstermontage Förderung — Nachtrag',
+  },
+} as const;
+
+function campaignHref(id: string, tab: string): string {
+  return `/kampagnen/${id}/${tab}`;
 }
 
 function hash64(seed: string): string {
@@ -152,7 +193,7 @@ function initialOutbox(): OutboxEvent[] {
       next_attempt_at: iso(2),
       last_error: null,
       created_at: iso(-95),
-      campaign_id: '1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
+      campaign_id: FIXTURE_CAMPAIGN_IDS.live,
     },
     {
       ...base,
@@ -172,7 +213,7 @@ function initialOutbox(): OutboxEvent[] {
         email: '[redigiert]',
       },
       created_at: iso(-240),
-      campaign_id: '1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
+      campaign_id: FIXTURE_CAMPAIGN_IDS.live,
       submission_id: 'a1f0c6d2-3b74-4f8e-9d21-7c5b8e0a1f44',
     },
     {
@@ -193,7 +234,7 @@ function initialOutbox(): OutboxEvent[] {
         user_data: '[redigiert]',
       },
       created_at: iso(-2880),
-      campaign_id: '1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
+      campaign_id: FIXTURE_CAMPAIGN_IDS.live,
       opportunity_id: '6b0d3e82-5a17-4c94-8f26-1d7e9b0a3c58',
     },
     {
@@ -210,7 +251,7 @@ function initialOutbox(): OutboxEvent[] {
       sent_at: iso(-4318),
       provider_response_redacted: { events_received: 1, fbtrace_id: '[redigiert]' },
       created_at: iso(-4320),
-      campaign_id: '2f5c8d01-3e74-4b26-9a8f-0d1e4c6b7f39',
+      campaign_id: FIXTURE_CAMPAIGN_IDS.paused,
       opportunity_id: '4e8a1c05-9b73-4d26-8017-2f5c6b3a9d84',
     },
     {
@@ -225,7 +266,7 @@ function initialOutbox(): OutboxEvent[] {
       next_attempt_at: iso(5),
       last_error: null,
       created_at: iso(-30),
-      campaign_id: '2f5c8d01-3e74-4b26-9a8f-0d1e4c6b7f39',
+      campaign_id: FIXTURE_CAMPAIGN_IDS.paused,
     },
   ];
 }
@@ -355,8 +396,8 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
     generatedAt: iso(0),
     activeCampaigns: [
       {
-        id: '1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
-        nameDe: 'Q3 Neukunden – Potenzialanalyse',
+        id: CAMPAIGNS.live.id,
+        nameDe: CAMPAIGNS.live.nameDe,
         state: 'LIVE',
         errorState: 'HUBSPOT_SYNC_FAILED',
         spendTodayMinor: 41_250,
@@ -366,26 +407,26 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         costPerLeadMinor: 6_875,
         maturity: 'PARTIAL',
         attributionCoverage: 0.82,
-        href: '/kampagnen/1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
+        href: campaignHref(CAMPAIGNS.live.id, 'live-performance'),
       },
       {
-        id: '2f5c8d01-3e74-4b26-9a8f-0d1e4c6b7f39',
-        nameDe: 'Sanierungsfahrplan – Bestandskunden',
-        state: 'LIVE',
+        id: CAMPAIGNS.metaDraft.id,
+        nameDe: CAMPAIGNS.metaDraft.nameDe,
+        state: 'META_DRAFT_CREATED',
         errorState: null,
-        spendTodayMinor: 18_900,
+        spendTodayMinor: 0,
         currency: 'EUR',
-        leadsToday: 2,
+        leadsToday: 0,
         targetCostPerLeadMinor: 8_000,
-        costPerLeadMinor: 9_450,
-        maturity: 'MATURE',
-        attributionCoverage: 0.94,
-        href: '/kampagnen/2f5c8d01-3e74-4b26-9a8f-0d1e4c6b7f39',
+        costPerLeadMinor: null,
+        maturity: 'IMMATURE',
+        attributionCoverage: null,
+        href: campaignHref(CAMPAIGNS.metaDraft.id, 'launch-qa'),
       },
       {
-        id: '3a6d9e12-4f85-4c37-8b90-1e2f5d7c8a40',
-        nameDe: 'Energieberatung Handwerk – Test 2',
-        state: 'SCHEDULED',
+        id: CAMPAIGNS.assetReview.id,
+        nameDe: CAMPAIGNS.assetReview.nameDe,
+        state: 'ASSET_REVIEW',
         errorState: null,
         spendTodayMinor: 0,
         currency: 'EUR',
@@ -394,7 +435,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         costPerLeadMinor: null,
         maturity: 'IMMATURE',
         attributionCoverage: null,
-        href: '/kampagnen/3a6d9e12-4f85-4c37-8b90-1e2f5d7c8a40',
+        href: campaignHref(CAMPAIGNS.assetReview.id, 'creatives'),
       },
     ],
     items: [
@@ -403,11 +444,11 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         kind: 'ERROR',
         titleDe: `HubSpot-Sync fehlgeschlagen – ${retrying + deadLetters} Ereignis(se) betroffen`,
         detailDe:
-          'Leads der Kampagne „Q3 Neukunden“ erreichen HubSpot nicht. Bis das behoben ist, sind VQ-, Abschluss- und Umsatzzahlen dieser Kampagne unvollständig.',
+          'Leads dieser Kampagne erreichen HubSpot nicht. Bis das behoben ist, sind VQ-, Abschluss- und Umsatzzahlen dieser Kampagne unvollständig.',
         href: '/integrationen/outbox',
         hrefLabelDe: 'Zur Fehlerliste',
         occurredAt: iso(-240),
-        campaignNameDe: 'Q3 Neukunden – Potenzialanalyse',
+        campaignNameDe: CAMPAIGNS.live.nameDe,
         badge: { kind: 'campaignError', state: 'HUBSPOT_SYNC_FAILED' },
         severity: 'HIGH',
       },
@@ -420,7 +461,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         href: '/integrationen/outbox',
         hrefLabelDe: 'Dead Letter öffnen',
         occurredAt: iso(-2880),
-        campaignNameDe: 'Q3 Neukunden – Potenzialanalyse',
+        campaignNameDe: CAMPAIGNS.live.nameDe,
         badge: { kind: 'outbox', state: 'DEAD_LETTER' },
         severity: 'HIGH',
       },
@@ -430,7 +471,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         titleDe: 'Tracking: 12 Ereignisse ohne Einwilligung verworfen',
         detailDe:
           'Für 12 Sitzungen lag keine Einwilligung zur Anzeigenmessung vor. Das ist korrekt, senkt aber die Abdeckung der Zuordnung.',
-        href: '/einstellungen#consent',
+        href: '/einstellungen?tab=compliance#consent',
         hrefLabelDe: 'Consent-Versionen prüfen',
         occurredAt: iso(-600),
         campaignNameDe: null,
@@ -440,25 +481,25 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
       {
         id: 'approval-assets-q3',
         kind: 'APPROVAL',
-        titleDe: 'Creatives freigeben – Q3 Neukunden',
+        titleDe: `Creatives freigeben – ${CAMPAIGNS.assetReview.nameDe}`,
         detailDe:
           'Sechs Creatives warten seit gestern auf die inhaltliche Freigabe. Ohne sie bleibt der Testplan blockiert.',
-        href: '/kampagnen/1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28/freigaben',
-        hrefLabelDe: 'Freigabe öffnen',
+        href: campaignHref(CAMPAIGNS.assetReview.id, 'creatives'),
+        hrefLabelDe: 'Creatives freigeben',
         occurredAt: iso(-1200),
-        campaignNameDe: 'Q3 Neukunden – Potenzialanalyse',
+        campaignNameDe: CAMPAIGNS.assetReview.nameDe,
         badge: { kind: 'approval', state: 'PENDING' },
         severity: 'HIGH',
       },
       {
         id: 'approval-strategy-handwerk',
         kind: 'APPROVAL',
-        titleDe: 'Strategie freigeben – Energieberatung Handwerk',
+        titleDe: `Strategie freigeben – ${CAMPAIGNS.strategyReview.nameDe}`,
         detailDe: 'Angle, Offer und Claims liegen zur Freigabe vor.',
-        href: '/kampagnen/3a6d9e12-4f85-4c37-8b90-1e2f5d7c8a40/freigaben',
-        hrefLabelDe: 'Freigabe öffnen',
+        href: campaignHref(CAMPAIGNS.strategyReview.id, 'strategie'),
+        hrefLabelDe: 'Strategie öffnen',
         occurredAt: iso(-2400),
-        campaignNameDe: 'Energieberatung Handwerk – Test 2',
+        campaignNameDe: CAMPAIGNS.strategyReview.nameDe,
         badge: { kind: 'approval', state: 'PENDING' },
         severity: 'MEDIUM',
       },
@@ -468,62 +509,62 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         titleDe: 'Creative pausieren – „Vergleich Alternative 2“',
         detailDe:
           '0 Leads bei 412,50 € Ausgaben, das entspricht dem 1,5-fachen des Ziel-CPL. Die Ausführung wird vorher im Detail angezeigt.',
-        href: '/kampagnen/1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28/empfehlungen',
+        href: campaignHref(CAMPAIGNS.live.id, 'empfehlungen'),
         hrefLabelDe: 'Empfehlung prüfen',
         occurredAt: iso(-300),
-        campaignNameDe: 'Q3 Neukunden – Potenzialanalyse',
+        campaignNameDe: CAMPAIGNS.live.nameDe,
         badge: { kind: 'recommendation', state: 'OPEN' },
         severity: 'HIGH',
       },
       {
         id: 'recommendation-collect-more',
         kind: 'RECOMMENDATION',
-        titleDe: 'Mehr Daten sammeln – Sanierungsfahrplan',
+        titleDe: `Mehr Daten sammeln – ${CAMPAIGNS.paused.nameDe}`,
         detailDe:
           '3 von 20 benötigten Conversions pro Arm erreicht. Es wird kein Gewinner ausgerufen.',
         href: '/experimente',
-        hrefLabelDe: 'Experiment öffnen',
+        hrefLabelDe: 'Experimente öffnen',
         occurredAt: iso(-720),
-        campaignNameDe: 'Sanierungsfahrplan – Bestandskunden',
+        campaignNameDe: CAMPAIGNS.paused.nameDe,
         badge: { kind: 'recommendation', state: 'OPEN' },
         severity: 'LOW',
       },
       {
         id: 'budget-warning-q3',
         kind: 'BUDGET_WARNING',
-        titleDe: 'Tagesbudget zu 92 % ausgeschöpft – Q3 Neukunden',
+        titleDe: `Tagesbudget zu 92 % ausgeschöpft – ${CAMPAIGNS.live.nameDe}`,
         detailDe:
           '412,50 € von 450,00 € Tagesbudget ausgegeben. Eine Erhöhung über 20 % benötigt eine Freigabe.',
-        href: '/kampagnen/1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
+        href: campaignHref(CAMPAIGNS.live.id, 'live-performance'),
         hrefLabelDe: 'Budget ansehen',
         occurredAt: iso(-45),
-        campaignNameDe: 'Q3 Neukunden – Potenzialanalyse',
+        campaignNameDe: CAMPAIGNS.live.nameDe,
         badge: null,
         severity: 'MEDIUM',
       },
       {
         id: 'performance-warning-cpl',
         kind: 'PERFORMANCE_WARNING',
-        titleDe: 'CPL 15 % über Ziel – Sanierungsfahrplan',
+        titleDe: `CPL 15 % über Ziel – ${CAMPAIGNS.paused.nameDe}`,
         detailDe:
           '94,50 € gegenüber 80,00 € Ziel-CPL, berechnet auf 2 Leads / 189,00 € der letzten 24 Stunden.',
         href: '/performance',
         hrefLabelDe: 'Performance ansehen',
         occurredAt: iso(-90),
-        campaignNameDe: 'Sanierungsfahrplan – Bestandskunden',
+        campaignNameDe: CAMPAIGNS.paused.nameDe,
         badge: null,
         severity: 'MEDIUM',
       },
       {
         id: 'matured-sanierungsfahrplan',
         kind: 'MATURED_RESULT',
-        titleDe: 'Ergebnisse reif – Sanierungsfahrplan (Kohorte Juli)',
+        titleDe: `Ergebnisse reif – ${CAMPAIGNS.completed.nameDe} (Kohorte Juni)`,
         detailDe:
           'Die CRM-Kohorte ist älter als 21 Tage. Ergebnis und Learning können jetzt festgehalten werden.',
-        href: '/learnings',
+        href: campaignHref(CAMPAIGNS.completed.id, 'learnings'),
         hrefLabelDe: 'Learning erstellen',
         occurredAt: iso(-1440),
-        campaignNameDe: 'Sanierungsfahrplan – Bestandskunden',
+        campaignNameDe: CAMPAIGNS.completed.nameDe,
         badge: null,
         severity: 'MEDIUM',
       },
@@ -532,8 +573,8 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         kind: 'PROPOSAL',
         titleDe: 'Neuer Kampagnenvorschlag: „Fachkräfte-Engpass“',
         detailDe: 'Drei Angles, zwei Offers, sechs Creative-Konzepte. Noch nicht gesichtet.',
-        href: '/kampagnen?filter=vorschlaege',
-        hrefLabelDe: 'Vorschlag ansehen',
+        href: '/kampagnen',
+        hrefLabelDe: 'Vorschläge ansehen',
         occurredAt: iso(-480),
         campaignNameDe: null,
         badge: { kind: 'campaign', state: 'PROPOSED' },
@@ -542,13 +583,13 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
       {
         id: 'immature-q3',
         kind: 'IMMATURE_COHORT',
-        titleDe: 'CRM-Kohorte noch unreif – Q3 Neukunden',
+        titleDe: `CRM-Kohorte noch unreif – ${CAMPAIGNS.live.nameDe}`,
         detailDe:
           'Die ältesten Leads sind 9 von 21 benötigten Tagen alt. Skalierung bleibt gesperrt, bis die Kohorte reif ist.',
-        href: '/kampagnen/1e4b7c90-2d63-4a15-8f7e-9c0d3b5a6e28',
-        hrefLabelDe: 'Kampagne ansehen',
+        href: campaignHref(CAMPAIGNS.live.id, 'leads-sales'),
+        hrefLabelDe: 'Leads und Abschlüsse ansehen',
         occurredAt: iso(-12960),
-        campaignNameDe: 'Q3 Neukunden – Potenzialanalyse',
+        campaignNameDe: CAMPAIGNS.live.nameDe,
         badge: null,
         severity: 'LOW',
       },
@@ -561,7 +602,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
               titleDe: 'Externe Schreibzugriffe sind deaktiviert',
               detailDe:
                 'Empfehlungen können vorbereitet, aber nicht ausgeführt werden. Jede Ausführung endet als Dry-Run.',
-              href: '/einstellungen#feature-flags',
+              href: '/einstellungen?tab=flags#feature-flags',
               hrefLabelDe: 'Feature-Flags ansehen',
               occurredAt: iso(0),
               campaignNameDe: null,
@@ -617,7 +658,7 @@ function buildLibrary(): LibrarySnapshot {
       evidence: {
         kindDe: 'Historische Performance',
         summaryDe: 'Median aus 9 Projekten; Datenbasis teilweise reif.',
-        sourceRefDe: 'kampagne/2f5c8d01',
+        sourceRefDe: 'kampagne/dachsanierung-foerderung-q2',
         approved: true,
       },
       requiresHypothesisLabel: false,
@@ -652,7 +693,7 @@ function buildLibrary(): LibrarySnapshot {
           attributionLevel: 'REVENUE_LINKED',
         },
         claims: [claims[0], claims[1]],
-        href: '/library/creatives/creative-1',
+        href: null,
       },
       {
         id: 'creative-2',
@@ -678,7 +719,7 @@ function buildLibrary(): LibrarySnapshot {
           attributionLevel: 'REVENUE_LINKED',
         },
         claims: [claims[0]],
-        href: '/library/creatives/creative-2',
+        href: null,
       },
       {
         id: 'creative-3',
@@ -704,7 +745,7 @@ function buildLibrary(): LibrarySnapshot {
           attributionLevel: 'TRAFFIC_LINKED',
         },
         claims: [claims[2]],
-        href: '/library/creatives/creative-3',
+        href: null,
       },
       {
         id: 'creative-4',
@@ -729,7 +770,7 @@ function buildLibrary(): LibrarySnapshot {
           attributionLevel: 'LEAD_LINKED',
         },
         claims: [claims[1], claims[3]],
-        href: '/library/creatives/creative-4',
+        href: null,
       },
       {
         id: 'creative-5',
@@ -753,7 +794,7 @@ function buildLibrary(): LibrarySnapshot {
           attributionLevel: 'CREATIVE_ONLY',
         },
         claims: [],
-        href: '/library/creatives/creative-5',
+        href: null,
       },
       {
         id: 'creative-6',
@@ -777,7 +818,7 @@ function buildLibrary(): LibrarySnapshot {
           attributionLevel: 'CREATIVE_ONLY',
         },
         claims: [claims[2]],
-        href: '/library/creatives/creative-6',
+        href: null,
       },
     ],
     angles: [
@@ -792,7 +833,7 @@ function buildLibrary(): LibrarySnapshot {
           { version: 2, status: 'PUBLISHED', summaryDe: 'Ergänzt um Mietrendite und Förderfrist.', publishedAt: '2026-06-12T09:00:00.000Z' },
         ],
         usedInCampaigns: 4,
-        href: '/library/angles/angle-1',
+        href: null,
       },
       {
         id: 'angle-2',
@@ -805,7 +846,7 @@ function buildLibrary(): LibrarySnapshot {
           { version: 2, status: 'DRAFT', summaryDe: 'Entwurf mit Vergleichsrechnung.', publishedAt: null },
         ],
         usedInCampaigns: 2,
-        href: '/library/angles/angle-2',
+        href: null,
       },
       {
         id: 'angle-3',
@@ -816,7 +857,7 @@ function buildLibrary(): LibrarySnapshot {
           { version: 1, status: 'PUBLISHED', summaryDe: 'Erstfassung.', publishedAt: '2026-03-15T09:00:00.000Z' },
         ],
         usedInCampaigns: 3,
-        href: '/library/angles/angle-3',
+        href: null,
       },
     ],
     offers: [
@@ -827,7 +868,7 @@ function buildLibrary(): LibrarySnapshot {
         promiseDe: 'Drei priorisierte Maßnahmen mit Einsparung und Förderhöhe — in 20 Minuten.',
         effortPromiseDe: '20 Minuten',
         usedInCampaigns: 5,
-        href: '/library/offers/offer-1',
+        href: null,
       },
       {
         id: 'offer-2',
@@ -836,7 +877,7 @@ function buildLibrary(): LibrarySnapshot {
         promiseDe: 'Vollständiger Fahrplan inklusive Förderantrag und Zeitplan.',
         effortPromiseDe: '2 Termine',
         usedInCampaigns: 3,
-        href: '/library/offers/offer-2',
+        href: null,
       },
     ],
     claims,
@@ -939,8 +980,8 @@ function buildLibrary(): LibrarySnapshot {
     ],
     historicalCampaigns: [
       {
-        id: 'hist-1',
-        nameDe: 'Q2 Bestandshalter – Potenzialanalyse',
+        id: CAMPAIGNS.completed.id,
+        nameDe: CAMPAIGNS.completed.nameDe,
         periodDe: '01.04.2026 – 30.06.2026',
         spendMinor: 1_284_000,
         currency: 'EUR',
@@ -952,11 +993,11 @@ function buildLibrary(): LibrarySnapshot {
           '187 Leads, 64 qualifizierte VQ, 11 Abschlüsse, 268.400 € Umsatz. CAC 1.167 €, ROAS 2,09×.',
         angleNameDe: 'Kostendruck im Bestand',
         offerNameDe: 'Kostenlose Potenzialanalyse',
-        href: '/kampagnen/hist-1',
+        href: campaignHref(CAMPAIGNS.completed.id, 'live-performance'),
       },
       {
-        id: 'hist-2',
-        nameDe: 'Frühjahr Handwerk – Sanierungsfahrplan',
+        id: CAMPAIGNS.paused.id,
+        nameDe: CAMPAIGNS.paused.nameDe,
         periodDe: '10.02.2026 – 28.03.2026',
         spendMinor: 486_500,
         currency: 'EUR',
@@ -968,11 +1009,11 @@ function buildLibrary(): LibrarySnapshot {
           '73 Leads, 19 qualifizierte VQ, Abschlussdaten unvollständig — die Umsatzzuordnung war zu diesem Zeitpunkt noch nicht aktiv.',
         angleNameDe: 'Förderung sicher mitnehmen',
         offerNameDe: 'Sanierungsfahrplan',
-        href: '/kampagnen/hist-2',
+        href: campaignHref(CAMPAIGNS.paused.id, 'live-performance'),
       },
       {
-        id: 'hist-3',
-        nameDe: 'Testlauf Reihenfolge-Angle',
+        id: CAMPAIGNS.invalidatedApproval.id,
+        nameDe: CAMPAIGNS.invalidatedApproval.nameDe,
         periodDe: '05.01.2026 – 26.01.2026',
         spendMinor: 118_000,
         currency: 'EUR',
@@ -984,7 +1025,7 @@ function buildLibrary(): LibrarySnapshot {
           'Nur Traffic zugeordnet: 4.108 Sitzungen, keine belastbare Lead-Zuordnung. Als Hypothese geführt.',
         angleNameDe: 'Reihenfolge schlägt Einzelmaßnahme',
         offerNameDe: null,
-        href: '/kampagnen/hist-3',
+        href: campaignHref(CAMPAIGNS.invalidatedApproval.id, 'live-performance'),
       },
     ],
   };

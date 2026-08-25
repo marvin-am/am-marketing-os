@@ -153,16 +153,6 @@ function seededInt(seed: string, min: number, max: number): number {
 /* Shared content                                                              */
 /* -------------------------------------------------------------------------- */
 
-const PRINCIPLE_LABELS_DE: Readonly<Record<CreativePrinciple, string>> = {
-  PROBLEM_PAIN: 'Problem und Schmerz',
-  CONCRETE_RESULT: 'Konkretes Ergebnis',
-  COMPARISON_ALTERNATIVE: 'Vergleich zur Alternative',
-  PROOF_CASE_DATAPOINT: 'Beleg, Case oder Datenpunkt',
-  OBJECTION_HANDLING: 'Einwandbehandlung',
-  CONTRARIAN_INSIGHT: 'Konträre Einsicht',
-};
-
-export { PRINCIPLE_LABELS_DE };
 
 const CONCEPT_SEEDS: ReadonlyArray<{
   name: string;
@@ -471,12 +461,27 @@ const SPECS: CampaignSpec[] = [
     angleName: 'Die Lücke zwischen zwei Großaufträgen',
     offerName: 'Individueller Audit',
     granted: ['STRATEGY'],
-    invalidated: ['STRATEGY'],
-    approvedConcepts: ['concept_1', 'concept_3', 'concept_4'],
+    invalidated: [],
+    approvedConcepts: ['concept_1', 'concept_3', 'concept_4', 'concept_2', 'concept_5'],
     collision: ['concept_2', 'concept_5'],
     hasPerformance: false,
     dailyBudgetMinor: 6_000,
     updatedDaysAgo: 1,
+    metaFailed: false,
+  },
+  {
+    slug: 'claim-nachtraeglich-geaendert',
+    name: 'Fenstermontage Förderung — Nachtrag',
+    state: 'TEST_PLAN_REVIEW',
+    angleName: 'Förderung nutzen, bevor sie ausläuft',
+    offerName: 'Checkliste Förderung',
+    granted: ['STRATEGY', 'ASSETS', 'TEST_PLAN'],
+    invalidated: ['STRATEGY'],
+    approvedConcepts: ['concept_1', 'concept_2', 'concept_3', 'concept_4', 'concept_5'],
+    collision: null,
+    hasPerformance: false,
+    dailyBudgetMinor: 7_000,
+    updatedDaysAgo: 3,
     metaFailed: false,
   },
   {
@@ -578,6 +583,20 @@ function buildApproval(
     invalidated_reason_de: invalidated ? APPROVAL_INVALIDATION_REASON_DE : null,
   };
 }
+
+/**
+ * Stable ids of the fixture campaigns, exported so the console's own tests and
+ * the E2E suite can address the deterministic dataset by name.
+ */
+export const FIXTURE_CAMPAIGN_IDS = {
+  live: fixtureUuid('campaign:live-potenzialanalyse'),
+  metaDraft: fixtureUuid('campaign:meta-entwurf-benchmark'),
+  assetReview: fixtureUuid('campaign:assets-in-pruefung'),
+  strategyReview: fixtureUuid('campaign:strategie-in-pruefung'),
+  invalidatedApproval: fixtureUuid('campaign:claim-nachtraeglich-geaendert'),
+  paused: fixtureUuid('campaign:pausiert-sanitaer'),
+  completed: fixtureUuid('campaign:abgeschlossen-dach'),
+} as const;
 
 const STORE = new Map<string, CampaignRecord>();
 
