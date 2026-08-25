@@ -42,6 +42,7 @@ import { draftNameWithMarker } from '@am/meta';
 import { FIXTURE_IDS } from '@am/funnel-schema';
 import { actionDryRun, actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { rolesWithPermission, ROLE_LABELS_DE } from '@/lib/permissions';
+import { readCampaignAuditLog } from './audit-sink';
 import type {
   ApprovalDecisionInput,
   ApprovalStatus,
@@ -818,6 +819,20 @@ function buildAudit(id: string, spec: CampaignSpec): AuditLog[] {
     );
   }
   return rows.sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
+}
+
+/**
+ * One list, newest first, out of the seeded chain and the rows the audit store
+ * holds. Deduplicated by id so a store that already contains the seeded history
+ * — which a Postgres deployment will — does not render every entry twice.
+ */
+export function mergeAuditLog(
+  seeded: readonly AuditLog[],
+  recorded: readonly AuditLog[],
+): AuditLog[] {
+  const byId = new Map<string, AuditLog>();
+  for (const row of [...seeded, ...recorded]) byId.set(row.id, row);
+  return [...byId.values()].sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
 }
 
 /**
@@ -2315,7 +2330,14 @@ class FixtureCampaignPort implements CampaignPort {
         },
       },
     ];
-    return { campaignId, versions, auditLog: record.audit };
+    /*
+     * The seeded chain is this campaign's history from before the process
+     * started; everything `defineAction` has recorded since is the same log and
+     * belongs in the same list. Reading only one of the two is how the tab ends
+     * up asserting "jede Änderung" while showing a frozen set of rows.
+     */
+    const recorded = await readCampaignAuditLog(WORKSPACE_ID, campaignId);
+    return { campaignId, versions, auditLog: mergeAuditLog(record.audit, recorded) };
   }
 
   /* ---- writes ---- */
