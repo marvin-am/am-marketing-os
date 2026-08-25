@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { actionError, actionOk } from '@/lib/action-result';
+import { dryRun } from '@am/domain';
+import { actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { FIXTURE_CAMPAIGN_IDS, getCampaignPort } from '@/server/campaign-fixtures';
 import type { ApprovalStatus, CampaignHeaderView } from '@/server/campaign-port';
 import { ApprovalPanel } from './approval-panel';
@@ -109,6 +110,175 @@ describe('ApprovalPanel — content-hash invalidation', () => {
     expect(
       screen.getByText(/Zuständig ist: Marketing Lead, Executive\./),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * A rollback is legal, but it is not progress. Offering it as the primary
+   * „next step" is how the campaign ended up walking backwards on a single
+   * click, so it is kept apart, worded as a step back, and confirmed.
+   */
+  it('keeps the way back apart from the next step and asks before taking it', async () => {
+    const user = userEvent.setup();
+    const { status, header } = await strategyApproval(FIXTURE_CAMPAIGN_IDS.metaDraft);
+    const run = vi.fn(async () => actionOk(header));
+
+    render(
+      <ApprovalPanel
+        campaignId={header.id}
+        status={status}
+        canDecide
+        requiredRoleDe="Marketing Lead"
+        decide={vi.fn(async () => actionOk(status))}
+        advance={{
+          labelDe: 'Kampagne live schalten',
+          to: 'LIVE',
+          run: vi.fn(async () => actionOk(header)),
+          permitted: true,
+        }}
+        rollback={{
+          labelDe: 'Zurück auf „Bereit für Meta-Entwurf"',
+          to: 'READY_FOR_META_DRAFT',
+          confirmDe: 'Das ist kein Fortschritt im Kampagnenablauf.',
+          run,
+          permitted: true,
+        }}
+      />,
+    );
+
+    const section = document.querySelector('[data-rollback-section]');
+    expect(section).toHaveTextContent('Schritt zurücknehmen');
+    expect(section).toHaveTextContent('kein Fortschritt im Kampagnenablauf');
+    expect(section).not.toContainElement(
+      screen.getByRole('button', { name: 'Kampagne live schalten' }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Zurück auf „Bereit für Meta-Entwurf"' }));
+    expect(run).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Ja, zurücksetzen' }));
+    expect(run).toHaveBeenCalledWith({ campaignId: header.id, to: 'READY_FOR_META_DRAFT' });
+  });
+
+  /**
+   * Creating the paused Meta draft is the most outward-facing action in the
+   * product. It used to fire on a single click, with no dialog and no payload,
+   * and then report a plain green success — the one shape a step that reaches a
+   * provider may never have (AGENTS.md rules 2 and 3).
+   */
+  it('confirms a step that writes to Meta against the payload before running it', async () => {
+    const user = userEvent.setup();
+    const { status, header } = await strategyApproval(FIXTURE_CAMPAIGN_IDS.metaDraft);
+    const run = vi.fn(async () => actionOk(header));
+    const payload = {
+      ad_account_id: null,
+      campaign: { name: 'AM | Benchmark Metallbau — Pilot', status: 'PAUSED' },
+    };
+
+    render(
+      <ApprovalPanel
+        campaignId={header.id}
+        status={status}
+        canDecide
+        requiredRoleDe="Marketing Lead"
+        decide={vi.fn(async () => actionOk(status))}
+        advance={{
+          labelDe: 'Pausierten Meta-Entwurf erstellen',
+          to: 'META_DRAFT_CREATED',
+          run,
+          permitted: true,
+          externalConfirm: { operation: 'meta.create_paused_draft_campaign', payload },
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Pausierten Meta-Entwurf erstellen' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('meta.create_paused_draft_campaign');
+    expect(dialog).toHaveTextContent('"ad_account_id": null');
+    expect(dialog).toHaveTextContent(/Ein Dry-Run legt bei Meta nichts an/);
+    expect(run).not.toHaveBeenCalled();
+
+    const confirm = screen.getByRole('button', { name: 'An Meta senden' });
+    expect(confirm).toBeDisabled();
+    await user.click(confirm);
+    expect(run).not.toHaveBeenCalled();
+
+    await user.type(screen.getByRole('textbox'), 'AUSFÜHREN');
+    await user.click(screen.getByRole('button', { name: 'An Meta senden' }));
+
+    expect(run).toHaveBeenCalledWith({ campaignId: header.id, to: 'META_DRAFT_CREATED' });
+  });
+
+  /** A dry run is not a success and must never be rendered as one. */
+  it('renders the dry run of that step as a dry run', async () => {
+    const user = userEvent.setup();
+    const { status, header } = await strategyApproval(FIXTURE_CAMPAIGN_IDS.metaDraft);
+
+    render(
+      <ApprovalPanel
+        campaignId={header.id}
+        status={status}
+        canDecide
+        requiredRoleDe="Marketing Lead"
+        decide={vi.fn(async () => actionOk(status))}
+        advance={{
+          labelDe: 'Pausierten Meta-Entwurf erstellen',
+          to: 'META_DRAFT_CREATED',
+          run: vi.fn(
+            async (): Promise<ActionResult<CampaignHeaderView>> => ({
+              status: 'dry_run',
+              dryRun: dryRun(
+                'META',
+                'meta.create_paused_draft_campaign',
+                { ad_account_id: null },
+                'Meta-Schreibzugriffe sind deaktiviert (EXTERNAL_WRITES_ENABLED / META_MUTATIONS_ENABLED = false). Es wurde nichts angelegt und der Status wurde nicht geändert.',
+              ),
+            }),
+          ),
+          permitted: true,
+          externalConfirm: { operation: 'meta.create_paused_draft_campaign', payload: {} },
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Pausierten Meta-Entwurf erstellen' }));
+    await screen.findByRole('alertdialog');
+    await user.type(screen.getByRole('textbox'), 'AUSFÜHREN');
+    await user.click(screen.getByRole('button', { name: 'An Meta senden' }));
+
+    await waitFor(() => expect(document.querySelector('[data-dry-run="true"]')).not.toBeNull());
+    expect(screen.getByText('Dry-Run – nicht ausgeführt')).toBeInTheDocument();
+    expect(screen.getByText(/Status wurde nicht geändert/)).toBeInTheDocument();
+    expect(screen.queryByText('Status geändert.')).not.toBeInTheDocument();
+  });
+
+  /** A step that only moves our own record needs no such gate. */
+  it('runs a purely internal step without a Meta dialog', async () => {
+    const user = userEvent.setup();
+    const { status, header } = await strategyApproval(FIXTURE_CAMPAIGN_IDS.metaDraft);
+    const run = vi.fn(async () => actionOk(header));
+
+    render(
+      <ApprovalPanel
+        campaignId={header.id}
+        status={status}
+        canDecide
+        requiredRoleDe="Marketing Lead"
+        decide={vi.fn(async () => actionOk(status))}
+        advance={{
+          labelDe: 'Weiter zur Launch-QA',
+          to: 'READY_FOR_LAUNCH_QA',
+          run,
+          permitted: true,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Weiter zur Launch-QA' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(run).toHaveBeenCalledWith({ campaignId: header.id, to: 'READY_FOR_LAUNCH_QA' });
   });
 
   it('surfaces a refused approval as a German error rather than a success', async () => {

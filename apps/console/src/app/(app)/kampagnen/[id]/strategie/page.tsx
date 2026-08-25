@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { APPROVAL_PERMISSIONS } from '@am/domain';
 import { Section } from '@am/ui';
-import { advanceOptionFor } from '@/components/campaign/advance';
+import { advanceOptionFor, rollbackOptionFor } from '@/components/campaign/advance';
 import { ApprovalPanel } from '@/components/campaign/approval-panel';
 import { StrategyPanel } from '@/components/campaign/strategy-panel';
 import { requireUser } from '@/lib/action';
@@ -20,6 +20,7 @@ export default async function StrategiePage({ params }: { params: Promise<{ id: 
   if (!view || !header) notFound();
 
   const option = advanceOptionFor('strategie', header.state);
+  const rollback = rollbackOptionFor('strategie', header.state);
 
   return (
     <div className="flex flex-col gap-8">
@@ -40,6 +41,17 @@ export default async function StrategiePage({ params }: { params: Promise<{ id: 
               ? {
                   labelDe: option.labelDe,
                   to: option.to,
+                  run: advanceCampaign,
+                  permitted: can(user, 'campaign.edit'),
+                }
+              : undefined
+          }
+          rollback={
+            rollback
+              ? {
+                  labelDe: rollback.labelDe,
+                  to: rollback.to,
+                  confirmDe: rollback.confirmDe,
                   run: advanceCampaign,
                   permitted: can(user, 'campaign.edit'),
                 }

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { APPROVAL_PERMISSIONS } from '@am/domain';
 import { Section } from '@am/ui';
-import { advanceOptionFor } from '@/components/campaign/advance';
+import { advanceOptionFor, rollbackOptionFor } from '@/components/campaign/advance';
 import { ApprovalPanel } from '@/components/campaign/approval-panel';
 import { assetGateBlockedReasonDe } from '@/components/campaign/gates';
 import { LaunchQaPanel } from '@/components/campaign/launch-qa-panel';
@@ -25,6 +25,7 @@ export default async function LaunchQaPage({ params }: { params: Promise<{ id: s
   if (!view || !header) notFound();
 
   const option = advanceOptionFor('launch-qa', header.state);
+  const rollback = rollbackOptionFor('launch-qa', header.state);
   const gateOpen =
     option === null
       ? false
@@ -42,6 +43,10 @@ export default async function LaunchQaPage({ params }: { params: Promise<{ id: s
       : null);
 
   const publishApproval = header.approvals.find((approval) => approval.kind === 'PUBLISH');
+
+  // The dialog shows the port's own payload rather than a second copy of it, so
+  // what the operator confirms is what the adapter would send.
+  const metaWrite = option ? (view.metaWrites.find((write) => write.to === option.to) ?? null) : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -68,6 +73,21 @@ export default async function LaunchQaPage({ params }: { params: Promise<{ id: s
                     run: option.publishing ? publishCampaign : advanceCampaign,
                     permitted: can(user, option.publishing ? 'campaign.publish' : 'campaign.edit'),
                     blockedReasonDe,
+                    externalConfirm:
+                      option.publishing && metaWrite
+                        ? { operation: metaWrite.operation, payload: metaWrite.payload }
+                        : null,
+                  }
+                : undefined
+            }
+            rollback={
+              rollback
+                ? {
+                    labelDe: rollback.labelDe,
+                    to: rollback.to,
+                    confirmDe: rollback.confirmDe,
+                    run: advanceCampaign,
+                    permitted: can(user, 'campaign.edit'),
                   }
                 : undefined
             }

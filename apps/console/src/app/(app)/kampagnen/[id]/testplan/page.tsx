@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { APPROVAL_PERMISSIONS } from '@am/domain';
 import { Section } from '@am/ui';
-import { advanceOptionFor } from '@/components/campaign/advance';
+import { advanceOptionFor, rollbackOptionFor } from '@/components/campaign/advance';
 import { ApprovalPanel } from '@/components/campaign/approval-panel';
 import { BudgetPanel } from '@/components/campaign/budget-panel';
 import { TestPlanPanel } from '@/components/campaign/test-plan-panel';
@@ -21,6 +21,7 @@ export default async function TestplanPage({ params }: { params: Promise<{ id: s
   if (!view || !header) notFound();
 
   const option = advanceOptionFor('testplan', header.state);
+  const rollback = rollbackOptionFor('testplan', header.state);
 
   return (
     <div className="flex flex-col gap-8">
@@ -41,6 +42,17 @@ export default async function TestplanPage({ params }: { params: Promise<{ id: s
               ? {
                   labelDe: option.labelDe,
                   to: option.to,
+                  run: advanceCampaign,
+                  permitted: can(user, 'campaign.edit'),
+                }
+              : undefined
+          }
+          rollback={
+            rollback
+              ? {
+                  labelDe: rollback.labelDe,
+                  to: rollback.to,
+                  confirmDe: rollback.confirmDe,
                   run: advanceCampaign,
                   permitted: can(user, 'campaign.edit'),
                 }

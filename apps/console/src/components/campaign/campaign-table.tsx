@@ -18,6 +18,7 @@ import { formatDate } from '@/lib/format';
 import type { CampaignListPage, CampaignListRow } from '@/server/campaign-port';
 import { campaignTabHref } from '@/server/campaign-port';
 import { REALITY, REALITY_ACCENT } from './labels';
+import { presentNextStep } from './next-step';
 import { MetricValueInline } from './rate-value';
 
 export interface CampaignTableProps {
@@ -132,6 +133,7 @@ export function CampaignTable({ page, filtered, buildPageHref }: CampaignTablePr
 
 function CampaignRow({ row }: { row: CampaignListRow }) {
   const reality = REALITY[row.reality];
+  const step = presentNextStep(row.nextAction, row.state, row.id);
   return (
     <TableRow data-campaign-row={row.id} data-reality={row.reality}>
       <TableCell>
@@ -168,24 +170,34 @@ function CampaignRow({ row }: { row: CampaignListRow }) {
       </TableCell>
       <TableCell className="max-w-64">
         <div className="flex flex-col gap-1">
-          <Link
-            href={row.nextAction.href}
-            className={cn(
-              'text-sm font-medium underline-offset-4 hover:underline',
-              row.nextAction.blocked ? 'text-warning' : 'text-foreground',
-            )}
-          >
-            {row.nextAction.labelDe}
-          </Link>
-          {row.nextAction.blocked && row.nextAction.blockedReasonDe ? (
+          {/*
+            The step is only a link where the link leads to the step. Where the
+            console has no control for it, the name stays plain text rather than
+            inviting a click that cannot deliver what it is named after.
+          */}
+          {step.target !== null && step.target.kind !== 'inspect' ? (
+            <Link
+              href={step.target.href}
+              className={cn(
+                'text-sm font-medium underline-offset-4 hover:underline',
+                step.blocked ? 'text-warning' : 'text-foreground',
+              )}
+            >
+              {step.labelDe}
+            </Link>
+          ) : (
+            <span className="text-sm font-medium text-foreground">{step.labelDe}</span>
+          )}
+          {step.blocked && step.blockedReasonDe ? (
             <span className="text-xs leading-snug text-warning">
-              Blockiert: {row.nextAction.blockedReasonDe}
+              Blockiert: {step.blockedReasonDe}
             </span>
           ) : (
-            <span className="text-xs leading-snug text-muted-foreground">
-              {row.nextAction.detailDe}
-            </span>
+            <span className="text-xs leading-snug text-muted-foreground">{step.detailDe}</span>
           )}
+          {step.noControlDe ? (
+            <span className="text-xs leading-snug text-muted-foreground">{step.noControlDe}</span>
+          ) : null}
         </div>
       </TableCell>
       <TableCell>

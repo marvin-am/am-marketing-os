@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { APPROVAL_PERMISSIONS } from '@am/domain';
-import { advanceOptionFor } from '@/components/campaign/advance';
+import { advanceOptionFor, rollbackOptionFor } from '@/components/campaign/advance';
 import { ApprovalPanel } from '@/components/campaign/approval-panel';
 import { CreativeGrid } from '@/components/campaign/creative-grid';
 import { assetGateBlockedReasonDe } from '@/components/campaign/gates';
@@ -21,6 +21,7 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
 
   const blockedReasonDe = assetGateBlockedReasonDe(board);
   const option = advanceOptionFor('creatives', header.state);
+  const rollback = rollbackOptionFor('creatives', header.state);
 
   return (
     <CreativeGrid
@@ -45,6 +46,17 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
                   run: advanceCampaign,
                   permitted: can(user, 'campaign.edit'),
                   blockedReasonDe,
+                }
+              : undefined
+          }
+          rollback={
+            rollback
+              ? {
+                  labelDe: rollback.labelDe,
+                  to: rollback.to,
+                  confirmDe: rollback.confirmDe,
+                  run: advanceCampaign,
+                  permitted: can(user, 'campaign.edit'),
                 }
               : undefined
           }

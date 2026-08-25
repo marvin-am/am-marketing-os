@@ -16,7 +16,13 @@ import {
 import { ArrowRight, CircleDot, Pause, ShieldAlert, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
 import type { CampaignHeaderView, CampaignReality } from '@/server/campaign-port';
-import { REALITY, REALITY_ACCENT, REALITY_SURFACE } from './labels';
+import {
+  metaFactsConfirmed,
+  realityDescriptor,
+  REALITY_ACCENT,
+  REALITY_SURFACE,
+} from './labels';
+import { presentNextStep } from './next-step';
 import { MetricValueInline } from './rate-value';
 
 /**
@@ -44,7 +50,10 @@ export function CampaignHeader({ header, actions }: CampaignHeaderProps) {
       data-reality={header.reality}
       className={cn('flex flex-col gap-4 rounded-xl border-2 p-4', REALITY_SURFACE[header.reality])}
     >
-      <RealityBanner reality={header.reality} />
+      <RealityBanner
+        reality={header.reality}
+        providerConfirmed={metaFactsConfirmed(header.providerSync)}
+      />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-col gap-2">
@@ -156,40 +165,61 @@ function ApprovalRail({ header }: { header: CampaignHeaderView }) {
   );
 }
 
-/** The single most important line on the screen: what has to happen next. */
+/**
+ * The single most important line on the screen: what has to happen next.
+ *
+ * The call to action is only rendered when there is somewhere worth going, and
+ * it never says „Jetzt erledigen" for a destination that cannot carry the step
+ * out — an operator who is sent to a page with no control loses the walkthrough
+ * before they find out the console cannot do it at all.
+ */
 export function NextActionCallout({ header }: { header: CampaignHeaderView }) {
-  const action = header.nextAction;
+  const step = presentNextStep(header.nextAction, header.state, header.id);
+  const target = step.target;
   return (
     <div
-      data-next-action={action.key}
+      data-next-action={step.key}
+      data-next-action-target={target?.kind ?? 'none'}
       className={cn(
         'flex flex-col gap-2 rounded-lg border border-border bg-surface p-3.5 sm:flex-row sm:items-center sm:justify-between',
-        action.blocked && 'border-warning-border bg-warning-surface',
+        step.blocked && 'border-warning-border bg-warning-surface',
       )}
     >
       <div className="flex min-w-0 items-start gap-2.5">
-        <span aria-hidden="true" className={cn('mt-0.5', action.blocked ? 'text-warning' : 'text-brand')}>
-          {action.blocked ? <TriangleAlert className="size-4.5" /> : <CircleDot className="size-4.5" />}
+        <span aria-hidden="true" className={cn('mt-0.5', step.blocked ? 'text-warning' : 'text-brand')}>
+          {step.blocked ? <TriangleAlert className="size-4.5" /> : <CircleDot className="size-4.5" />}
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="text-sm font-semibold text-foreground">
             <span className="text-muted-foreground">Nächster erforderlicher Schritt: </span>
-            {action.labelDe}
+            {step.labelDe}
           </p>
-          <p className="text-xs leading-relaxed text-muted-foreground">{action.detailDe}</p>
-          {action.blocked && action.blockedReasonDe ? (
+          <p className="text-xs leading-relaxed text-muted-foreground">{step.detailDe}</p>
+          {step.blocked && step.blockedReasonDe ? (
             <p className="text-xs font-medium leading-relaxed text-warning">
-              Blockiert: {action.blockedReasonDe}
+              Blockiert: {step.blockedReasonDe}
+            </p>
+          ) : null}
+          {step.noControlDe ? (
+            <p data-next-action-no-control="" className="text-xs leading-relaxed text-foreground/80">
+              {step.noControlDe}
             </p>
           ) : null}
         </div>
       </div>
-      <Button asChild variant={action.blocked ? 'secondary' : 'primary'} size="sm" className="shrink-0">
-        <Link href={action.href}>
-          {action.blocked ? 'Blocker ansehen' : 'Jetzt erledigen'}
-          <ArrowRight aria-hidden="true" />
-        </Link>
-      </Button>
+      {target ? (
+        <Button
+          asChild
+          variant={target.kind === 'perform' ? 'primary' : 'secondary'}
+          size="sm"
+          className="shrink-0"
+        >
+          <Link href={target.href}>
+            {target.ctaDe}
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -198,9 +228,19 @@ export function NextActionCallout({ header }: { header: CampaignHeaderView }) {
  * The visual separator between the four realities. It repeats the word, the
  * icon and a full German sentence — nobody has to read a colour to know whether
  * something is live.
+ *
+ * `providerConfirmed` decides whether the sentence may state a Meta-side fact.
+ * It defaults to false so the banner under-claims rather than over-claims when
+ * a caller has no provider answer to hand.
  */
-export function RealityBanner({ reality }: { reality: CampaignReality }) {
-  const descriptor = REALITY[reality];
+export function RealityBanner({
+  reality,
+  providerConfirmed = false,
+}: {
+  reality: CampaignReality;
+  providerConfirmed?: boolean;
+}) {
+  const descriptor = realityDescriptor(reality, providerConfirmed);
   const Icon = reality === 'LIVE' ? CircleDot : reality === 'ENDED' ? ShieldCheck : Pause;
   return (
     <div
