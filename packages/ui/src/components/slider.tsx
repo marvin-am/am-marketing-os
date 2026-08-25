@@ -44,7 +44,7 @@ export const Slider = React.forwardRef<
           className={cn(
             'block size-5 rounded-full border-2 border-brand bg-surface shadow-sm',
             'transition-[box-shadow,transform] duration-150',
-            'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             'disabled:pointer-events-none disabled:opacity-50',
           )}
         />

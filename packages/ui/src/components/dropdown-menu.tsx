@@ -17,9 +17,17 @@ const SURFACE = cn(
   'data-[state=open]:animate-am-in data-[state=closed]:animate-am-out',
 );
 
+/*
+ * A menu row's highlight is its state indicator, not a focus ring. Radix moves
+ * real DOM focus onto the row the pointer is over, so `:focus` and even
+ * `:focus-visible` match while the mouse merely hovers — an outline here would
+ * follow the cursor. The suppression is therefore intentional; `outline-hidden`
+ * keeps the row identifiable in forced-colours mode, where the tinted
+ * background is dropped.
+ */
 const ITEM = cn(
   'relative flex min-h-9 cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm',
-  'outline-none transition-colors',
+  'outline-hidden transition-colors',
   'focus:bg-surface-sunken focus:text-foreground',
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
   '[&_svg]:size-4 [&_svg]:shrink-0',

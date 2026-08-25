@@ -21,7 +21,8 @@ export const PopoverContent = React.forwardRef<
         sideOffset={sideOffset}
         className={cn(
           'z-50 w-72 rounded-lg border border-border bg-surface p-4 text-sm text-foreground shadow-lg',
-          'focus:outline-none data-[state=open]:animate-am-in data-[state=closed]:animate-am-out',
+          // Focus lands on the panel when it opens; see `DialogContent`.
+          'focus:outline-hidden data-[state=open]:animate-am-in data-[state=closed]:animate-am-out',
           className,
         )}
         {...props}

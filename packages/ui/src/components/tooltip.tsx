@@ -94,7 +94,7 @@ export function InfoHint({ children, label, className, side = 'top' }: InfoHintP
               className={cn(
                 'relative inline-flex size-5 items-center justify-center rounded-full',
                 'text-muted-foreground transition-colors hover:text-foreground',
-                'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                 "after:absolute after:left-1/2 after:top-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
               )}
             >

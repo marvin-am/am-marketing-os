@@ -38,7 +38,13 @@ export const ScrollArea = React.forwardRef<
   return (
     <ScrollAreaPrimitive.Root ref={ref} className={cn('relative overflow-hidden', className)} {...props}>
       <ScrollAreaPrimitive.Viewport
-        className={cn('size-full rounded-[inherit]', viewportClassName)}
+        className={cn(
+          'size-full rounded-[inherit]',
+          // Inset: the root clips its children, so an outset ring would be
+          // invisible on a region that is a real tab stop.
+          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+          viewportClassName,
+        )}
         // Keyboard users must be able to scroll the region, so it stays focusable.
         tabIndex={0}
       >

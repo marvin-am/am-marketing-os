@@ -452,7 +452,7 @@ export function FunnelForm({
         <h1
           ref={stepHeadingRef}
           tabIndex={-1}
-          className="break-words text-xl font-semibold tracking-tight text-foreground outline-none"
+          className="break-words text-xl font-semibold tracking-tight text-foreground outline-hidden"
         >
           {step.title}
         </h1>

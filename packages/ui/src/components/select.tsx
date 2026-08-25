@@ -21,7 +21,7 @@ export const SelectTrigger = React.forwardRef<
         size === 'sm' ? 'h-9' : 'h-11',
         'text-left text-foreground data-[placeholder]:text-muted-foreground',
         'transition-[border-color,box-shadow] duration-150',
-        'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         'disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70',
         'aria-[invalid=true]:border-destructive',
         '[&>span]:truncate',
@@ -92,7 +92,9 @@ export const SelectItem = React.forwardRef<
       ref={ref}
       className={cn(
         'relative flex min-h-9 w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm',
-        'outline-none transition-colors focus:bg-surface-sunken',
+        // Highlight, not focus ring: Radix focuses the option under the
+        // pointer, so an outline would track the cursor. See `DropdownMenuItem`.
+        'outline-hidden transition-colors focus:bg-surface-sunken',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className,
       )}

@@ -105,7 +105,9 @@ export const SidebarNavItem = React.forwardRef<HTMLAnchorElement, SidebarNavItem
           className={cn(
             'group relative flex min-h-11 min-w-0 items-center gap-2.5 overflow-hidden rounded-md px-3 text-sm',
             'transition-colors duration-150',
-            'outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+            // Inset: the row is `overflow-hidden` for the active rail, which
+            // would clip an outset ring.
+            'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
             'text-muted-foreground hover:bg-surface-sunken hover:text-foreground',
             // Active rows get a brand rail plus a weight change, so the current
             // page is not signalled by colour alone.

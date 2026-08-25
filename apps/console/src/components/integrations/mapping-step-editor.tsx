@@ -29,7 +29,7 @@ import {
  */
 
 const selectClass =
-  'h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground shadow-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70';
+  'h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70';
 
 export interface MappingStepEditorProps {
   fields: readonly MappingFieldDescriptor[];

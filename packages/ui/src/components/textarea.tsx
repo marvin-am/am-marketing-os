@@ -41,7 +41,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
         'flex w-full rounded-md border border-input bg-surface px-3 py-2.5 text-sm text-foreground shadow-xs',
         'placeholder:text-muted-foreground',
         'transition-[border-color,box-shadow] duration-150',
-        'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         'disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70',
         'aria-[invalid=true]:border-destructive aria-[invalid=true]:outline-destructive',
         autoResize ? 'resize-none overflow-hidden' : 'resize-y',

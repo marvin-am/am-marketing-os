@@ -10,7 +10,8 @@ import { cn } from '../lib/cn';
 
 export const sheetVariants = cva(
   cn(
-    'fixed z-50 flex flex-col border-border bg-surface shadow-xl focus:outline-none',
+    // Focus lands on the panel when it opens; see `DialogContent`.
+    'fixed z-50 flex flex-col border-border bg-surface shadow-xl focus:outline-hidden',
     'data-[state=open]:animate-am-in data-[state=closed]:animate-am-out',
   ),
   {

@@ -33,7 +33,9 @@ export const TabsTrigger = React.forwardRef<
       className={cn(
         'relative inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-t-md px-3.5 text-sm font-medium',
         'text-muted-foreground transition-colors',
-        'outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+        // Inset: the trigger sits on the list's bottom border, so an outset
+        // ring would be clipped by the neighbouring tab.
+        'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
         'hover:text-foreground',
         'disabled:pointer-events-none disabled:opacity-50',
         'data-[state=active]:text-foreground',
@@ -58,7 +60,7 @@ export const TabsContent = React.forwardRef<
     <TabsPrimitive.Content
       ref={ref}
       className={cn(
-        'mt-5 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'mt-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         className,
       )}
       {...props}

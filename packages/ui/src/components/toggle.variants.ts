@@ -12,7 +12,7 @@ export const toggleVariants = cva(
   cn(
     'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium',
     'transition-colors duration-150',
-    'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
     'disabled:pointer-events-none disabled:opacity-50',
     'hover:bg-surface-sunken',
     // Pressed state carries a border and a weight change alongside the tint.

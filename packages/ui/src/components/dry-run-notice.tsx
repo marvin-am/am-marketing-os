@@ -92,7 +92,7 @@ export const DryRunNotice = React.forwardRef<HTMLDivElement, DryRunNoticeProps>(
             className={cn(
               'flex min-h-11 w-full items-center justify-between gap-2 px-4 text-left text-xs font-medium text-muted-foreground',
               'transition-colors hover:text-foreground',
-              'outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
             )}
           >
             <span>{open ? 'Nutzlast ausblenden' : 'Nutzlast anzeigen (würde gesendet werden)'}</span>

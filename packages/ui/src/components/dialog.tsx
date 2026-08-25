@@ -58,7 +58,11 @@ export const DialogContent = React.forwardRef<
         className={cn(
           'fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col',
           'rounded-xl border border-border bg-surface shadow-xl',
-          'focus:outline-none',
+          // The panel takes focus when it opens; the ring belongs on the
+          // controls inside it, not around the whole dialog. `outline-hidden`
+          // rather than `outline-none` keeps a ring in forced-colours mode,
+          // where the border and shadow that delimit the panel are dropped.
+          'focus:outline-hidden',
           'data-[state=open]:animate-am-in data-[state=closed]:animate-am-out',
           SIZE_CLASS[size],
           className,
@@ -71,7 +75,7 @@ export const DialogContent = React.forwardRef<
             className={cn(
               'absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md',
               'text-muted-foreground transition-colors hover:bg-surface-sunken hover:text-foreground',
-              'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
               "after:absolute after:left-1/2 after:top-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
             )}
           >

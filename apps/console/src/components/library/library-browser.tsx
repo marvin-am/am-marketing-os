@@ -65,7 +65,7 @@ export const CREATIVE_PRINCIPLE_LABELS_DE: Readonly<Record<CreativePrinciple, st
 };
 
 const selectClass =
-  'h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground shadow-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+  'h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
 export const LIBRARY_TABS = [
   'creatives',

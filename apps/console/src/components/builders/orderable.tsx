@@ -126,7 +126,7 @@ function SortableRow({
           aria-label={`${itemNounDe} ${entry.labelDe} mit der Tastatur oder Maus verschieben`}
           className={cn(
             'flex size-6 cursor-grab items-center justify-center rounded text-muted-foreground',
-            'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             'hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50',
           )}
           {...attributes}

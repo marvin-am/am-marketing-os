@@ -32,7 +32,7 @@ export function CampaignTabs({ campaignId }: { campaignId: string }) {
                 data-campaign-tab={tab}
                 className={cn(
                   'inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-3 text-sm font-medium',
-                  'outline-none transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                  'transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                   active
                     ? 'border-brand text-foreground'
                     : 'border-transparent text-muted-foreground hover:border-border-strong hover:text-foreground',

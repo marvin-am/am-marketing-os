@@ -59,7 +59,8 @@ export const DrawerContent: React.ForwardRefExoticComponent<
         ref={ref}
         className={cn(
           'fixed inset-x-0 bottom-0 z-50 mt-24 flex max-h-[92dvh] flex-col',
-          'rounded-t-2xl border border-b-0 border-border bg-surface shadow-xl focus:outline-none',
+          // Focus lands on the panel when it opens; see `DialogContent`.
+          'rounded-t-2xl border border-b-0 border-border bg-surface shadow-xl focus:outline-hidden',
           className,
         )}
         {...props}

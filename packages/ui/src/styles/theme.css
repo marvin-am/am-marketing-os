@@ -346,7 +346,22 @@
   }
 
   /* One focus treatment for the whole product: a 2px brand ring with a
-     background-coloured offset so it stays visible on tinted surfaces. */
+     background-coloured offset so it stays visible on tinted surfaces.
+     `--am-ring` clears 4.7:1 against every surface token in light mode and
+     6:1 in dark, well past the 3:1 that WCAG 1.4.11 asks of an indicator.
+
+     Components restate the same ring with `focus-visible:outline-2
+     focus-visible:outline-offset-2 focus-visible:outline-ring` where they need
+     a different offset. What a focusable control must not carry is
+     `outline-none` — or `outline-hidden`. Both set `--tw-outline-style: none`
+     on the element, and in Tailwind v4 every outline-width utility resolves
+     its style from that same variable, so `outline-none focus-visible:
+     outline-2` computes to `outline-style: none; outline-width: 0px` and
+     paints nothing at all. (Tailwind v3 compiled `outline-none` to a
+     transparent 2px outline, which supplied the style the width utility was
+     missing — hence the pairing that used to be correct.) Suppression belongs
+     only where focus moves programmatically and no ring is wanted: dialog and
+     popover panels, and menu rows whose highlight follows the pointer. */
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;

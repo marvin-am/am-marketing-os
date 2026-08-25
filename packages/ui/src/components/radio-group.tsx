@@ -23,7 +23,7 @@ export const RadioGroupItem = React.forwardRef<
       className={cn(
         'inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-input bg-surface',
         'transition-[border-color,box-shadow] duration-150',
-        'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'data-[state=checked]:border-brand',
         'aria-[invalid=true]:border-destructive',

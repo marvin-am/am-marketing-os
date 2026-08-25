@@ -47,7 +47,7 @@ export const SheetContent = React.forwardRef<
           className={cn(
             'absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md',
             'text-muted-foreground transition-colors hover:bg-surface-sunken hover:text-foreground',
-            'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             "after:absolute after:left-1/2 after:top-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
           )}
         >
