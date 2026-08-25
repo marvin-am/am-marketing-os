@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "echo \"source package — consumed via transpilePackages\"",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src integration --max-warnings 0",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
