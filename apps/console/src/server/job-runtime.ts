@@ -1,4 +1,4 @@
-import { getAppConfig, getFeatureFlags } from '@am/config';
+import { getAppConfig, getFeatureFlags, resolveProviderMode } from '@am/config';
 import {
   createMemoryPorts,
   createMemoryState,
@@ -26,6 +26,10 @@ function getDemoState(): MemoryPortsState {
 }
 
 export async function buildJobPorts(): Promise<JobPorts> {
+  if (resolveProviderMode('SUPABASE') === 'LIVE') {
+    const { createSupabaseJobPorts } = await import('./job-ports-supabase');
+    return createSupabaseJobPorts();
+  }
   return createMemoryPorts(getDemoState());
 }
 
