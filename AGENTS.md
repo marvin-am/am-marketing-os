@@ -119,6 +119,24 @@ Run from the repo root: `pnpm test`, `pnpm typecheck`, `pnpm lint`,
 Every sub-agent ships **code + tests + a short integration report**. A plan alone
 is not a deliverable.
 
+## Ports at package boundaries
+
+Adapters do not reach for the database. `@am/meta`, `@am/hubspot`,
+`@am/creative-renderer` and `@am/jobs` all declare the narrow interface they
+need and take an implementation as a parameter; the composition happens in the
+app (`apps/console/src/server/`, `apps/funnels/src/server/`).
+
+Two reasons this is worth the indirection. An adapter that can reach the
+database grows its own persistence opinions, and then a provider change becomes
+a schema change. And a package with no I/O of its own is testable without
+infrastructure — which is why `@am/jobs` has real tests for lock contention,
+backoff and dead-lettering without a Postgres anywhere.
+
+Each port has an in-memory implementation that enforces the **same** invariants
+as the real one — the same unique constraints, the same idempotency, a lock that
+actually locks. A test that passes against the memory implementation is testing
+behaviour, not a permissive stub.
+
 ## Fixtures and demo mode
 
 `DEMO_MODE=true` routes every provider through a deterministic fixture
