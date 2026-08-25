@@ -1,4 +1,4 @@
-import { DomainError, isDomainError, type DryRunResult } from '@am/domain';
+import { type DomainError, isDomainError, type DryRunResult } from '@am/domain';
 
 /**
  * The uniform result shape every server action returns.

@@ -15,7 +15,7 @@ import {
 } from './format';
 
 /** German formatting uses a comma decimal separator and a dot for thousands. */
-const nbsp = / | |\s/g;
+const nbsp = /[\s\u00A0\u202F\u2009]/gu;
 const normalize = (value: string) => value.replace(nbsp, ' ');
 
 describe('numbers', () => {
