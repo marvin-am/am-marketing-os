@@ -72,25 +72,74 @@ export const auditLogSchema = z.object({
 });
 export type AuditLog = z.infer<typeof auditLogSchema>;
 
-/** Keys stripped from `before`/`after` payloads before they are persisted. */
+/**
+ * Key fragments stripped from audit and log payloads.
+ *
+ * Matched as normalised substrings, not exact keys: `phone_number`,
+ * `emailAddress` and `contact_email` carry the same personal data as `phone`
+ * and `email`, and an exact-match list quietly lets every variant through —
+ * which matters here more than anywhere, because `@am/observability` routes
+ * every log line through `redact()`.
+ */
 export const AUDIT_REDACT_KEYS: readonly string[] = [
   'email',
+  'mail',
   'phone',
-  'first_name',
-  'last_name',
-  'firstName',
-  'lastName',
-  'access_token',
-  'refresh_token',
-  'client_secret',
-  'api_key',
-  'apiKey',
+  'telefon',
+  'mobile',
+  'firstname',
+  'lastname',
+  'vorname',
+  'nachname',
+  'fullname',
+  'accesstoken',
+  'refreshtoken',
+  'clientsecret',
+  'apikey',
   'authorization',
   'password',
-  'service_role_key',
+  'secret',
+  'servicerolekey',
   'answers',
+  'antworten',
   'pii',
 ];
+
+const REDACTED = '[redacted]';
+
+/** Patterns redacted out of a *value*, even when its key looks innocent. */
+const VALUE_PATTERNS: readonly RegExp[] = [
+  /[\w.+-]+@[\w-]+\.[\w.-]+/g,
+  /(?:\+|\b00)\d[\d\s\-()/.]{7,}\d/g,
+  /(?:^|[^\d+])(0\d[\d\s\-()/.]{8,}\d)/g,
+];
+
+function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function isRedactedKey(key: string, keys: readonly string[]): boolean {
+  const normalized = normalizeKey(key);
+  return keys.some((candidate) => normalized.includes(normalizeKey(candidate)));
+}
+
+/**
+ * Replaces contact data found inside a string, leaving the rest intact.
+ *
+ * A landing URL with an address in a query parameter still has debugging value
+ * once the address is gone, so the pattern is replaced rather than the whole
+ * value — redacting everything teaches people to stop reading the logs.
+ */
+function redactValue(value: string): string {
+  let result = value;
+  for (const pattern of VALUE_PATTERNS) {
+    result = result.replace(pattern, (match) => {
+      const leading = /^[^\d+]/.test(match) ? match[0] : '';
+      return `${leading}${REDACTED}`;
+    });
+  }
+  return result;
+}
 
 /**
  * Deep-redacts audit and log payloads. Values are replaced with a marker rather
@@ -100,12 +149,11 @@ export function redact<T>(value: T, keys: readonly string[] = AUDIT_REDACT_KEYS)
   const walk = (input: unknown): unknown => {
     if (input === null || input === undefined) return input;
     if (Array.isArray(input)) return input.map(walk);
+    if (typeof input === 'string') return redactValue(input);
     if (typeof input === 'object') {
       const result: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(input as Record<string, unknown>)) {
-        result[key] = keys.some((k) => k.toLowerCase() === key.toLowerCase())
-          ? '[redacted]'
-          : walk(child);
+        result[key] = isRedactedKey(key, keys) ? REDACTED : walk(child);
       }
       return result;
     }

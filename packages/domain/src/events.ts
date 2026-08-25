@@ -225,8 +225,32 @@ export const FORBIDDEN_EVENT_KEYS: readonly string[] = [
   'user_agent',
 ];
 
+/**
+ * Key matching is a normalised substring test, not equality: `phone_number`,
+ * `emailAddress` and `contact_email` are the same personal data as `phone` and
+ * `email`, and an exact-match list quietly lets every variant through.
+ */
+export function isForbiddenEventKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z]/g, '');
+  return FORBIDDEN_EVENT_KEYS.some((forbidden) =>
+    normalized.includes(forbidden.replace(/[^a-z]/g, '')),
+  );
+}
+
 const EMAIL_LIKE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
-const PHONE_LIKE = /(?:\+|\b00)\d[\d\s\-()/.]{6,}\d/;
+
+/**
+ * International format: a leading `+` or `00`, then enough digits.
+ */
+const PHONE_INTERNATIONAL = /(?:\+|\b00)\d[\d\s\-()/.]{6,}\d/;
+
+/**
+ * German national format — `0151 23456789`, `030/12345678`, `01512345678`.
+ *
+ * This is the shape a German visitor actually types, so leaving it out made the
+ * guard miss the common case while catching the rare one.
+ */
+const PHONE_NATIONAL_DE = /(?:^|[^\d+])0\d[\d\s\-()/.]{7,}\d/;
 
 /**
  * Identifier shapes that are legitimately present in every event and must not
@@ -237,12 +261,47 @@ const PHONE_LIKE = /(?:\+|\b00)\d[\d\s\-()/.]{6,}\d/;
 const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_TIMESTAMP_LIKE = /^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/;
 
+/**
+ * A bare digit run with no `+`, no leading `0` and no separators is genuinely
+ * ambiguous: a Meta object id, a spend figure in minor units and a phone number
+ * all look the same. Rather than guess, this matches only a DACH country code
+ * at a length a real number has — which catches `4915123456789` while leaving
+ * six-figure amounts and fifteen-plus-digit provider ids alone.
+ *
+ * The primary defence against a phone number is the key check; this is the
+ * backstop for the case where someone put one under an innocent key.
+ */
+const PHONE_BARE_DACH = /^(?:49|43|41)\d{9,11}$/;
+
 /** A phone number has enough digits to be one. Ids and dates do not qualify. */
 function looksLikePhoneNumber(value: string): boolean {
-  const match = PHONE_LIKE.exec(value);
-  if (!match) return false;
-  const digits = match[0].replace(/\D/g, '');
-  return digits.length >= 8 && digits.length <= 16;
+  const trimmed = value.trim();
+  if (PHONE_BARE_DACH.test(trimmed)) return true;
+
+  for (const pattern of [PHONE_INTERNATIONAL, PHONE_NATIONAL_DE]) {
+    const match = pattern.exec(value);
+    if (!match) continue;
+    const digits = match[0].replace(/\D/g, '');
+    if (digits.length >= 9 && digits.length <= 16) return true;
+  }
+  return false;
+}
+
+/**
+ * Percent-encoding is the one transformation worth undoing before scanning:
+ * `max%40example.de` reaches us from a query string routinely and is the same
+ * address. Deeper obfuscation (base64, "max (at) example.de") is deliberately
+ * out of scope — the guard is a structural backstop against a mistake, not an
+ * adversary, and chasing every encoding would trade false negatives for false
+ * positives on legitimate ids.
+ */
+function decodeForScan(value: string): string {
+  if (!value.includes('%')) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /**
@@ -256,11 +315,15 @@ export function findPiiViolations(payload: unknown, path = '$'): string[] {
   const walk = (value: unknown, currentPath: string): void => {
     if (value === null || value === undefined) return;
 
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
+    // Numbers are scanned too: a phone number arriving as `4915123456789`
+    // rather than a string is the same personal datum.
+    if (typeof value === 'string' || typeof value === 'number') {
+      const raw = String(value);
+      const trimmed = raw.trim();
       if (UUID_LIKE.test(trimmed) || ISO_TIMESTAMP_LIKE.test(trimmed)) return;
-      if (EMAIL_LIKE.test(value)) violations.push(`${currentPath} (E-Mail-Muster)`);
-      else if (looksLikePhoneNumber(value)) violations.push(`${currentPath} (Telefonnummer-Muster)`);
+      const scanned = decodeForScan(raw);
+      if (EMAIL_LIKE.test(scanned)) violations.push(`${currentPath} (E-Mail-Muster)`);
+      else if (looksLikePhoneNumber(scanned)) violations.push(`${currentPath} (Telefonnummer-Muster)`);
       return;
     }
 
@@ -271,8 +334,7 @@ export function findPiiViolations(payload: unknown, path = '$'): string[] {
 
     if (typeof value === 'object') {
       for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-        const normalizedKey = key.toLowerCase();
-        if (FORBIDDEN_EVENT_KEYS.includes(normalizedKey)) {
+        if (isForbiddenEventKey(key)) {
           violations.push(`${currentPath}.${key} (verbotener Schlüssel)`);
           continue;
         }
