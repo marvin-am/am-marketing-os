@@ -1,3 +1,4 @@
+import { LAUNCH_TOKEN_PARAM } from '@am/domain';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { getServerEnv } from '@am/config';
@@ -47,7 +48,7 @@ import {
 export const LAUNCH_TOKEN_VERSION = 'v1';
 
 /** Query parameter that carries the token on a landing URL. */
-export const LAUNCH_TOKEN_PARAM = 'am_t';
+export { LAUNCH_TOKEN_PARAM };
 
 /**
  * Default lifetime: 180 days. The token has to outlive the campaign — an

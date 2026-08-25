@@ -40,6 +40,19 @@ export type ClientEventType = z.infer<typeof clientEventTypeSchema>;
 
 export const EVENT_SCHEMA_VERSION = 1 as const;
 
+/**
+ * Query parameter carrying the server-signed launch token on every ad
+ * destination URL.
+ *
+ * It lives in `@am/domain` rather than in `@am/tracking` because two packages
+ * that never import each other both depend on it: `@am/meta` writes it into the
+ * Meta ad URL and `@am/tracking` reads it back in the funnel runtime. A private
+ * constant in each would let them drift, and the failure mode is silent — the
+ * runtime simply finds no token and every lead falls back to UNKNOWN
+ * attribution, which looks like weak campaigns rather than a bug.
+ */
+export const LAUNCH_TOKEN_PARAM = 'am_t';
+
 /* -------------------------------------------------------------------------- */
 /* Standardised validation error codes                                         */
 /* -------------------------------------------------------------------------- */
