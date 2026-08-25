@@ -4,7 +4,7 @@ import { PageHeader, Section } from '@am/ui';
 import { LearningsBrowser } from '@/components/analytics/learnings-browser';
 import { requireUser } from '@/lib/action';
 import { formatNumber } from '@/lib/format';
-import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
+import { getAnalyticsPort } from '@/server/analytics-factory';
 
 /**
  * Learnings — the distilled memory of what was tested.
@@ -17,7 +17,7 @@ import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
 export default async function LearningsPage(): Promise<React.JSX.Element> {
   await requireUser('campaign.read');
 
-  const port = createAnalyticsFixturePort();
+  const port = getAnalyticsPort();
   const cards = await port.listLearningCards();
 
   const counts = cards.reduce<Record<ConfidenceLabel, number>>(

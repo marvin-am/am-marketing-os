@@ -21,14 +21,14 @@ import type {
 } from './ports';
 
 /**
- * In-memory implementation of `FunnelStore`.
+ * In-memory implementation of `FunnelStore`, seeded from `@am/funnel-schema`'s
+ * fixtures.
  *
- * `@am/db` is not wired into this app yet, so the runtime ships with a store
- * seeded from `@am/funnel-schema`'s fixtures. That is a deliberate choice over
- * stubbing the routes: every code path below — publication state, idempotency,
- * the transactional outbox — is real and is exercised by the tests, so swapping
- * in the Postgres implementation is a one-line change in `store.ts` rather than
- * a rewrite of the routes.
+ * This is what DEMO_MODE serves, and what makes the funnel demonstrable end to
+ * end with no database anywhere. It is not a stub: every code path below —
+ * publication state, idempotency, the transactional outbox — enforces the same
+ * invariants the Postgres implementation does, which is why the same contract
+ * suite runs against both.
  *
  * Nothing here pretends to be a database: the store is per-process, it is lost
  * on restart, and `mode` reports `'memory'` so no surface can claim otherwise.

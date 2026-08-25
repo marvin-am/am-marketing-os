@@ -10,7 +10,8 @@ import { PerformanceFilters } from '@/components/analytics/performance-filters';
 import { TimeSeriesChart } from '@/components/analytics/time-series-chart';
 import { requireUser } from '@/lib/action';
 import { formatDate, formatNumber } from '@/lib/format';
-import { clampRangeToHistory, createAnalyticsFixturePort } from '@/server/analytics-fixtures';
+import { getAnalyticsPort } from '@/server/analytics-factory';
+import { clampRangeToHistory } from '@/server/analytics-fixtures';
 
 /**
  * Performance — the whole funnel in one view.
@@ -71,7 +72,7 @@ export default async function PerformancePage({
 
   const params = await searchParams;
   const now = new Date().toISOString();
-  const port = createAnalyticsFixturePort({ now });
+  const port = getAnalyticsPort({ now });
 
   const selection = resolveRange(
     {
@@ -144,12 +145,23 @@ export default async function PerformancePage({
         description="Erstparteiische Funnel-Daten. Nur PRODUCTION-Traffic wird gezählt; Vorschau-, Bot-, interner und Test-Traffic bleibt außen vor."
       >
         <MetricGrid snapshot={overview.total} keys={FUNNEL_METRICS} columns={3} />
-        <p className="text-xs text-muted-foreground">
-          Vor der Auswertung ausgeschlossen:{' '}
-          <span data-am-numeric="">{formatNumber(overview.exclusions.events)}</span> Ereignisse und{' '}
-          <span data-am-numeric="">{formatNumber(overview.exclusions.crmRecords)}</span>{' '}
-          CRM-Datensätze aus nicht-produktivem Traffic.
-        </p>
+        {overview.exclusions ? (
+          <p className="text-xs text-muted-foreground">
+            Vor der Auswertung ausgeschlossen:{' '}
+            <span data-am-numeric="">{formatNumber(overview.exclusions.events)}</span> Ereignisse
+            und{' '}
+            <span data-am-numeric="">{formatNumber(overview.exclusions.crmRecords)}</span>{' '}
+            CRM-Datensätze aus nicht-produktivem Traffic.
+          </p>
+        ) : (
+          /* "0 ausgeschlossen" would say nothing was filtered out, which is a
+             claim about the data rather than about what is stored. */
+          <p className="text-xs text-muted-foreground" data-am-exclusions-unknown="">
+            Nicht-produktiver Traffic ist aus diesen Zahlen ausgeschlossen. Wie viel es war, ist
+            nicht hinterlegt: die Rollups speichern nur, was gezählt wurde, nicht was verworfen
+            wurde.
+          </p>
+        )}
       </Section>
 
       <Section

@@ -3,7 +3,12 @@ import { timingSafeEqual } from 'node:crypto';
 import { getServerEnv } from '@am/config';
 import { JOB_NAMES, getJob, runJob, type JobName } from '@am/jobs';
 import { logger } from '@am/observability';
-import { buildJobPorts, buildJobProviders, jobEnvironment } from '@/server/job-runtime';
+import {
+  buildJobPorts,
+  buildJobProviders,
+  jobEnvironment,
+  resolveJobWorkspaceId,
+} from '@/server/job-runtime';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -38,7 +43,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ job
   }
 
   const definition = getJob(job);
-  const { environment, flags, workspaceId } = jobEnvironment();
+  const { environment, flags } = jobEnvironment();
+  /* Resolved rather than assumed: a hard-coded id makes every rollup insert
+     violate its foreign key, and the job reports success on rows the database
+     rejected. */
+  const workspaceId = await resolveJobWorkspaceId();
 
   // Finish a little before the platform's own timeout so the job can stop
   // cleanly between batches and report a partial result.

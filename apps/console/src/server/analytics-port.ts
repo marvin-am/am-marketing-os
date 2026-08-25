@@ -146,8 +146,16 @@ export interface PerformanceOverview {
   /** One point per UTC day in the range, including days with no activity. */
   series: DailyPoint[];
   crmDelay: CrmDelayStatement;
-  /** Rows excluded before anything was counted — preview, bot, internal, test. */
-  exclusions: RollupExclusions;
+  /**
+   * Rows excluded before anything was counted — preview, bot, internal, test.
+   *
+   * Null when the store cannot answer it. `performance_rollups` holds
+   * PRODUCTION traffic only and keeps no tally of what was dropped on the way
+   * in: the rollup job counts it and does not persist it. Reporting zero would
+   * state that nothing was excluded, which is a different claim from not
+   * knowing, and the one the screen would otherwise make.
+   */
+  exclusions: RollupExclusions | null;
 }
 
 export interface FunnelDropOff {

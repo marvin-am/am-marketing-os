@@ -40,13 +40,14 @@ import type { ActionResult } from '@/lib/action-result';
 /**
  * The single data port of the campaign list and the Campaign Room.
  *
- * `@am/db` does not exist yet, so every screen reads through this interface and
- * `campaign-fixtures.ts` implements it against the fixture data the packages
- * already ship. Swapping in the real repositories is one wiring change:
- * implement `CampaignPort` and return it from `getCampaignPort()`.
+ * Every screen reads through this interface and never through a repository or a
+ * provider, so which store is behind it is a decision `getCampaignPort()` makes
+ * once, from configuration. Two implementations exist and no screen can tell
+ * them apart: `campaign-fixtures.ts` against the fixture data the packages ship,
+ * and `campaign-db-port.ts` against the repositories in `@am/db`.
  *
- * Three properties the implementation must uphold, because the UI states them
- * as facts and the fixture implementation enforces them:
+ * Three properties every implementation must uphold, because the UI states them
+ * as facts:
  *
  * 1. **An approval covers a content hash, not an object.** Every view that can
  *    be approved carries `contentHash`; the port must invalidate an approval

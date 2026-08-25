@@ -1,5 +1,4 @@
 import {
-  canonicalize,
   canTransition,
   canWriteMeta,
   CREATIVE_PRINCIPLES,
@@ -38,11 +37,25 @@ import {
   type Role,
 } from '@am/domain';
 import { getFeatureFlags } from '@am/config';
+import { resolveDatabase, type AmDatabase } from '@am/db';
 import { draftNameWithMarker } from '@am/meta';
 import { FIXTURE_IDS } from '@am/funnel-schema';
+import { logger } from '@am/observability';
 import { actionDryRun, actionError, actionOk, type ActionResult } from '@/lib/action-result';
 import { rolesWithPermission, ROLE_LABELS_DE } from '@/lib/permissions';
 import { readCampaignAuditLog } from './audit-sink';
+import { createDatabaseCampaignPort } from './campaign-db-port';
+import {
+  assetsContentHash,
+  campaignContentHash,
+  publishContentHash,
+  strategyContentHash,
+  testPlanContentHash,
+  type AssetsContent,
+  type StrategyContent,
+  type TestPlanContent,
+} from './campaign-content-hash';
+import { createPgTransactionRunner } from './campaign-transaction';
 import type {
   ApprovalDecisionInput,
   ApprovalStatus,
@@ -84,14 +97,14 @@ import type {
 import { campaignTabHref } from './campaign-port';
 
 /**
- * In-memory `CampaignPort` backed by the fixture data the packages already
- * ship, so the campaign list and the whole Campaign Room are walkable **today**,
- * before `@am/db` exists.
+ * The demo-mode `CampaignPort`, backed by the fixture data the packages ship.
  *
- * It is a fixture and it behaves like one: state lives in module scope and is
- * lost when the server process restarts. It is not a cache and not a stand-in
- * for a database. The lead swaps in the real repositories by implementing
- * `CampaignPort` and returning it from `getCampaignPort()`.
+ * This is what makes the campaign list and the whole Campaign Room walkable with
+ * no database at all — `DEMO_MODE=true`, no credentials, the E2E suite. It is a
+ * fixture and it behaves like one: state lives in module scope and is lost when
+ * the server process restarts. It is not a cache and not a stand-in for a
+ * database; once a Supabase project is configured and demo mode is off,
+ * `getCampaignPort()` returns the repository-backed port instead.
  *
  * What it does model faithfully, because the UI states these as facts:
  *
@@ -137,18 +150,10 @@ function fixtureUuid(seed: string): string {
 }
 
 /**
- * 64-hex content hash. Pure and synchronous on purpose: the same function has
- * to run in a server component and in a jsdom test, so `node:crypto` and
- * `crypto.subtle` are both out.
+ * 64-hex content hash, shared with the repository-backed port so an approval
+ * granted against one store means the same thing in the other.
  */
-export function fixtureContentHash(value: unknown): string {
-  const canonical = canonicalize(value);
-  let out = '';
-  for (let i = 0; i < 8; i += 1) {
-    out += (fnv1a32(`${i}:${canonical}`) >>> 0).toString(16).padStart(8, '0');
-  }
-  return out;
-}
+export const fixtureContentHash = campaignContentHash;
 
 function seededInt(seed: string, min: number, max: number): number {
   const span = max - min + 1;
@@ -678,46 +683,49 @@ function seedStore(): void {
 /* Content hashes                                                              */
 /* -------------------------------------------------------------------------- */
 
-function strategyContent(spec: CampaignSpec) {
+function strategyContent(spec: CampaignSpec): StrategyContent {
   return {
     angle: spec.angleName,
     offer: spec.offerName,
     claims: CLAIMS.map((c) => c.text),
     coreMessage: coreMessageFor(spec),
+    // The fixture holds no campaign version rows; the repository-backed port
+    // fills this from `campaign_versions.content_hash`.
+    versionHash: null,
   };
 }
 
-function assetsContent(approved: string[]) {
-  return { creatives: [...approved].sort(), funnels: FUNNEL_PROPOSALS.map((f) => f.key) };
+function assetsContent(approved: string[]): AssetsContent {
+  return { creatives: approved, funnels: FUNNEL_PROPOSALS.map((f) => f.key) };
 }
 
-function testPlanContent(spec: CampaignSpec, dailyBudgetMinor: number) {
+function testPlanContent(spec: CampaignSpec, dailyBudgetMinor: number): TestPlanContent {
   return { plan: spec.slug, dailyBudgetMinor };
 }
 
 function hashFor(spec: CampaignSpec, kind: ApprovalKind): string {
   switch (kind) {
     case 'STRATEGY':
-      return fixtureContentHash(strategyContent(spec));
+      return strategyContentHash(strategyContent(spec));
     case 'ASSETS':
-      return fixtureContentHash(assetsContent(spec.approvedConcepts));
+      return assetsContentHash(assetsContent(spec.approvedConcepts));
     case 'TEST_PLAN':
-      return fixtureContentHash(testPlanContent(spec, spec.dailyBudgetMinor));
+      return testPlanContentHash(testPlanContent(spec, spec.dailyBudgetMinor));
     default:
-      return fixtureContentHash({ publish: spec.slug });
+      return publishContentHash({ publish: spec.slug });
   }
 }
 
 function currentHash(record: CampaignRecord, kind: ApprovalKind): string {
   switch (kind) {
     case 'STRATEGY':
-      return fixtureContentHash(strategyContent(record.spec));
+      return strategyContentHash(strategyContent(record.spec));
     case 'ASSETS':
-      return fixtureContentHash(assetsContent(approvedConceptKeys(record)));
+      return assetsContentHash(assetsContent(approvedConceptKeys(record)));
     case 'TEST_PLAN':
-      return fixtureContentHash(testPlanContent(record.spec, record.dailyBudgetMinor));
+      return testPlanContentHash(testPlanContent(record.spec, record.dailyBudgetMinor));
     default:
-      return fixtureContentHash({ publish: record.spec.slug });
+      return publishContentHash({ publish: record.spec.slug });
   }
 }
 
@@ -2645,12 +2653,58 @@ export function filterRows(rows: CampaignListRow[], query: CampaignListQuery): C
 let port: CampaignPort | null = null;
 
 /**
- * The single place fixture vs. repository is decided. Swap the constructor here
- * once `@am/db` ships a campaign repository — no screen changes.
+ * The single place fixture vs. repository is decided.
+ *
+ * `resolveDatabase()` already owns that decision for the whole product — demo
+ * mode first, then whether a Supabase project is configured at all — and reports
+ * which store it chose. Re-deriving it from `DEMO_MODE` here would be a second
+ * answer to a question that already has one, and the two would eventually
+ * disagree. `mode: 'memory'` means nothing is persisted, which is precisely the
+ * situation the fixture exists for; `mode: 'supabase'` means the repositories
+ * can answer, and the Campaign Room reads and writes real rows.
+ *
+ * The client is rebuilt per call rather than captured once, because a Supabase
+ * server client carries the requesting operator's session: one shared instance
+ * would hand every later request whichever operator happened to construct it,
+ * and RLS would then be evaluated for the wrong person.
  */
 export function getCampaignPort(): CampaignPort {
-  port ??= new FixtureCampaignPort();
+  if (port) return port;
+
+  const { mode } = resolveDatabase({ demo: getFeatureFlags().demoMode });
+  logger.info('campaign_port_ready', { store: mode });
+
+  if (mode === 'memory') {
+    port = new FixtureCampaignPort();
+    return port;
+  }
+
+  port = createDatabaseCampaignPort({
+    database: campaignDatabase,
+    workspaceId: WORKSPACE_ID,
+    // Without a DATABASE_URL the multi-row writes have no way to be atomic, and
+    // the port refuses them rather than performing half of one.
+    transaction: createPgTransactionRunner(),
+  });
   return port;
+}
+
+/**
+ * Repositories for one call, bound to the requesting operator's cookies so RLS
+ * and the capability policies in `0018_role_gated_writes.sql` are evaluated for
+ * the operator who pressed the button.
+ *
+ * `next/headers` is imported dynamically: this module is also loaded by the
+ * component tests, which have no request scope, and a static import would pull
+ * the request context into every one of them.
+ */
+async function campaignDatabase(): Promise<AmDatabase> {
+  const { cookies } = await import('next/headers');
+  const store = await cookies();
+  return resolveDatabase({
+    demo: getFeatureFlags().demoMode,
+    cookies: { getAll: () => store.getAll() },
+  }).db;
 }
 
 /** Test seam: replaces the port for the duration of a test. */

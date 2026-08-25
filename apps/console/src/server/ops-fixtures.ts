@@ -1,4 +1,4 @@
-import { getFeatureFlags, resolveProviderMode } from '@am/config';
+import { getFeatureFlags } from '@am/config';
 import {
   DEFAULT_ATTRIBUTION_WINDOW_DAYS,
   DEFAULT_EXPERIMENT_THRESHOLDS,
@@ -15,16 +15,11 @@ import {
   type Role,
   type RoleBudgetLimit,
 } from '@am/domain';
-import { checkOpenAiHealth } from '@am/ai';
-import { checkSupabaseHealth } from '@am/db';
 import {
   FIXTURE_MAPPING,
   INCOMPLETE_FIXTURE_MAPPING,
   MAPPING_WIZARD_STEPS,
   canPublishMapping,
-  checkHubspotHealth,
-  createFixtureCrmSeed,
-  createHubspotProvider,
   createInMemorySyncStore,
   mappingDocumentSchema,
   missingRequiredMappings,
@@ -37,18 +32,11 @@ import {
   type MappingWizardStepKey,
   type TestLeadResult,
 } from '@am/hubspot';
-import {
-  META_HEALTH_LABELS_DE,
-  createMetaProvider,
-  getMetaCredentials,
-  runMetaHealthChecks,
-} from '@am/meta';
+import { resolveDatabase } from '@am/db';
 import { FIXTURE_CAMPAIGN_IDS } from './campaign-fixtures';
 import {
-  META_WIZARD_STEP_KEYS,
   type ApprovalThresholds,
   type BrandTokens,
-  type CredentialSlot,
   type FeatureFlagView,
   type HubspotMappingSnapshot,
   type HubspotStepView,
@@ -56,8 +44,6 @@ import {
   type LibrarySnapshot,
   type MappingVersionSummary,
   type MetaSetupSnapshot,
-  type MetaWizardStep,
-  type MetaWizardStepKey,
   type OpsPort,
   type OutboxRow,
   type OutboxSnapshot,
@@ -67,14 +53,27 @@ import {
   type TodaySnapshot,
   type WorkspaceMemberView,
 } from './ops-port';
+import { createLiveOpsPort } from './ops-live';
+import { FLAG_VIEW_TEXTS_DE, OUTBOX_DESTINATION_LABELS_DE } from './ops-text';
+import {
+  buildMetaSetupSnapshot,
+  hubspotProviderFor,
+  probeHubspot,
+  probeMeta,
+  probeOpenAi,
+  probeSupabase,
+} from './provider-probes';
+import { CONSOLE_WORKSPACE_ID } from './workspace';
 
 /**
  * Fixture implementation of `OpsPort`.
  *
- * It exists so Heute, Library, Integrationen and Einstellungen are walkable
- * **today**, before `@am/db` lands. It is a fixture and behaves like one: state
- * lives in module scope and is lost when the server process restarts. It is not
- * a cache, not a queue and not a stand-in for a database.
+ * The demo-mode implementation: it is what makes Heute, Library, Integrationen
+ * and Einstellungen walkable with no database at all, and it is what the console
+ * serves whenever `resolveDatabase()` reports the in-memory store. It behaves
+ * like a fixture: state lives in module scope and is lost when the server
+ * process restarts. It is not a cache, not a queue and not a stand-in for a
+ * database — `ops-live.ts` is the implementation over the schema.
  *
  * What it models faithfully, because the screens assert it to the operator:
  *
@@ -1037,167 +1036,35 @@ function buildLibrary(): LibrarySnapshot {
 /* -------------------------------------------------------------------------- */
 
 /**
- * OpenAI and Supabase are probed by their owning packages, exactly as Meta and
- * HubSpot are. Neither reports a connection this file inferred from an
- * environment variable: `checkOpenAiHealth` lists models, `checkSupabaseHealth`
- * opens a connection and reads the catalogue, and each reports what it found.
- * `now` is pinned to the fixture anchor so the snapshot stays deterministic.
+ * The probes live in `provider-probes.ts` and are the real ones: they ask each
+ * provider and report what it answered. `now` is pinned to the fixture anchor so
+ * the snapshot stays deterministic; the mapping and the test-lead evidence come
+ * from this file's own state.
  */
-async function openAiHealth(): Promise<ProviderHealth> {
-  return checkOpenAiHealth({ now: iso(0) });
+function openAiHealth(): Promise<ProviderHealth> {
+  return probeOpenAi(iso(0));
 }
 
-async function supabaseHealth(): Promise<ProviderHealth> {
-  return checkSupabaseHealth({ now: iso(0) });
+function supabaseHealth(): Promise<ProviderHealth> {
+  return probeSupabase(iso(0));
 }
 
-async function metaHealth(flags: FeatureFlags): Promise<ProviderHealth> {
-  const provider = createMetaProvider({ flags });
-  return runMetaHealthChecks({
-    provider,
-    credentials: getMetaCredentials(),
+function metaHealth(flags: FeatureFlags): Promise<ProviderHealth> {
+  return probeMeta(flags, iso(0));
+}
+
+function hubspotHealth(flags: FeatureFlags): Promise<ProviderHealth> {
+  const published = state.mappingVersions.at(-1) ?? null;
+  return probeHubspot({
+    mapping: published ?? state.mappingDraft,
     flags,
+    testLead: state.testLead,
     now: iso(0),
   });
 }
 
-function hubspotProviderInstance(flags: FeatureFlags) {
-  return createHubspotProvider({ flags, seed: createFixtureCrmSeed() });
-}
-
-async function hubspotHealth(flags: FeatureFlags): Promise<ProviderHealth> {
-  const published = state.mappingVersions.at(-1) ?? null;
-  const mapping = published ?? state.mappingDraft;
-  return checkHubspotHealth(
-    {
-      mapping,
-      flags,
-      lastSuccessfulSyncAt: state.testLead?.status === 'PASS' ? state.testLead.finishedAt : null,
-      webhookSubscription: {
-        active: mapping.webhook.subscribedObjectTypes.length > 0,
-        subscribedTypes: mapping.webhook.subscribedObjectTypes,
-        secretConfigured: false,
-      },
-      testLead: state.testLead
-        ? { status: state.testLead.status, at: state.testLead.finishedAt }
-        : null,
-    },
-    { provider: hubspotProviderInstance(flags), now: () => iso(0) },
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Meta wizard                                                                 */
-/* -------------------------------------------------------------------------- */
-
-const META_STEP_DESCRIPTIONS_DE: Readonly<Record<MetaWizardStepKey, string>> = {
-  'meta.app_connection':
-    'Meta-App verbinden und Zugriffstoken hinterlegen. Ohne Token bleibt die Konsole im Fixture-Modus.',
-  'meta.business': 'Business-Manager auswählen, aus dem Werbekonto, Seite und Dataset stammen.',
-  'meta.ad_account': 'Werbekonto auswählen, in dem Entwürfe angelegt und Insights gelesen werden.',
-  'meta.page_ig':
-    'Facebook-Seite und optional das Instagram-Konto verknüpfen. Ohne Seite kann kein Creative angelegt werden.',
-  'meta.pixel_dataset':
-    'Pixel und optional ein separates Dataset für Down-Funnel-Ereignisse auswählen.',
-  'meta.permissions': 'Die tatsächlich erteilten Berechtigungen prüfen — sie werden nie angenommen.',
-  'meta.insights_read': 'Lesetest gegen die Insights-API über die letzten sieben Tage.',
-  'meta.draft_test':
-    'Entwurfsplan bauen und prüfen. Es wird nichts angelegt; alle Objekte wären pausiert.',
-  'meta.capi_test':
-    'Ein vollständig gehashtes Ereignispaar erzeugen und die Deduplizierung prüfen. Es wird nichts gesendet.',
-  'meta.final_health':
-    'Gesamtergebnis aller Prüfungen. Erst wenn hier nichts mehr offen ist, ist die Meta-Anbindung vollständig.',
-};
-
-const META_STEP_ENV_VARS: Readonly<Record<MetaWizardStepKey, string[]>> = {
-  'meta.app_connection': ['META_APP_ID', 'META_APP_SECRET', 'META_ACCESS_TOKEN'],
-  'meta.business': [],
-  'meta.ad_account': ['META_AD_ACCOUNT_ID'],
-  'meta.page_ig': ['META_PAGE_ID', 'META_INSTAGRAM_ACTOR_ID'],
-  'meta.pixel_dataset': ['META_PIXEL_ID', 'META_DATASET_ID'],
-  'meta.permissions': [],
-  'meta.insights_read': [],
-  'meta.draft_test': ['EXTERNAL_WRITES_ENABLED', 'META_MUTATIONS_ENABLED'],
-  'meta.capi_test': ['EXTERNAL_WRITES_ENABLED', 'META_CAPI_ENABLED'],
-  'meta.final_health': [],
-};
-
-function credentialSlots(mode: 'FIXTURE' | 'LIVE'): CredentialSlot[] {
-  const credentials = getMetaCredentials();
-  const slot = (
-    labelDe: string,
-    envVar: string,
-    value: string | null,
-    secret = false,
-  ): CredentialSlot => ({
-    labelDe,
-    envVar,
-    present: Boolean(value),
-    // A secret is never rendered, and in fixture mode no id is presented as if
-    // it came from Meta.
-    displayValue: value && !secret && mode === 'LIVE' ? value : null,
-    originDe: value
-      ? secret
-        ? `Hinterlegt über ${envVar} (wird nicht angezeigt).`
-        : mode === 'LIVE'
-          ? `Hinterlegt über ${envVar}.`
-          : `Hinterlegt über ${envVar}; im Fixture-Modus nicht gegen Meta geprüft.`
-      : `Nicht hinterlegt (${envVar}).`,
-  });
-
-  return [
-    slot('App-ID', 'META_APP_ID', credentials.appId),
-    slot('Zugriffstoken', 'META_ACCESS_TOKEN', credentials.accessToken, true),
-    slot('Business-Manager-ID', 'META_BUSINESS_ID', credentials.businessId),
-    slot('Werbekonto', 'META_AD_ACCOUNT_ID', credentials.adAccountId),
-    slot('Facebook-Seite', 'META_PAGE_ID', credentials.pageId),
-    slot('Instagram-Konto', 'META_INSTAGRAM_ACTOR_ID', credentials.instagramActorId),
-    slot('Pixel', 'META_PIXEL_ID', credentials.pixelId),
-    slot('Dataset', 'META_DATASET_ID', credentials.datasetId),
-  ];
-}
-
-function toMetaSteps(health: ProviderHealth): MetaWizardStep[] {
-  return META_WIZARD_STEP_KEYS.map((key, index) => {
-    if (key === 'meta.final_health') {
-      return {
-        key,
-        order: index + 1,
-        labelDe: 'Abschließende Gesamtprüfung',
-        descriptionDe: META_STEP_DESCRIPTIONS_DE[key],
-        status: health.overall,
-        check: null,
-        requiredEnvVars: META_STEP_ENV_VARS[key],
-      };
-    }
-    const check = health.checks.find((c) => c.key === key) ?? null;
-    return {
-      key,
-      order: index + 1,
-      labelDe: META_HEALTH_LABELS_DE[key],
-      descriptionDe: META_STEP_DESCRIPTIONS_DE[key],
-      status: check?.status ?? 'AWAITING_EXTERNAL_INPUT',
-      check,
-      requiredEnvVars: META_STEP_ENV_VARS[key],
-    };
-  });
-}
-
-async function buildMetaSetup(flags: FeatureFlags): Promise<MetaSetupSnapshot> {
-  const mode = resolveProviderMode('META');
-  const health = await metaHealth(flags);
-  return {
-    generatedAt: iso(0),
-    mode,
-    fixtureNoticeDe:
-      mode === 'FIXTURE'
-        ? 'Der Assistent läuft gegen den Meta-Fixture-Anbieter. Es besteht keine Verbindung zu Meta, alle angezeigten Strukturen und Zahlen stammen aus dem Testdatensatz. Sobald Zugangsdaten hinterlegt sind, laufen dieselben Prüfungen gegen das echte Konto.'
-        : null,
-    health,
-    steps: toMetaSteps(health),
-    credentials: credentialSlots(mode),
-    flags,
-  };
+function buildMetaSetup(flags: FeatureFlags): Promise<MetaSetupSnapshot> {
+  return buildMetaSetupSnapshot(flags, iso(0));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1495,17 +1362,11 @@ async function buildIntegrations(flags: FeatureFlags): Promise<IntegrationsSnaps
 /* Outbox                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const DESTINATION_LABELS_DE: Readonly<Record<OutboxEvent['destination'], string>> = {
-  META_CAPI: 'Meta Conversions API',
-  META_MARKETING_API: 'Meta Marketing API',
-  HUBSPOT: 'HubSpot',
-};
-
 function buildOutbox(): OutboxSnapshot {
   const counts = outboxCounts();
   const rows: OutboxRow[] = state.outbox.map((event) => ({
     event,
-    destinationLabelDe: DESTINATION_LABELS_DE[event.destination],
+    destinationLabelDe: OUTBOX_DESTINATION_LABELS_DE[event.destination],
     retryable: event.status === 'FAILED_RETRYING' || event.status === 'DEAD_LETTER',
     href: event.campaign_id ? `/kampagnen/${event.campaign_id}` : null,
   }));
@@ -1522,46 +1383,11 @@ function buildOutbox(): OutboxSnapshot {
 /* Settings                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const FLAG_LABELS_DE: Readonly<Record<keyof FeatureFlags, { labelDe: string; envVar: string; explanationDe: string }>> = {
-  demoMode: {
-    labelDe: 'Demo-Modus',
-    envVar: 'DEMO_MODE',
-    explanationDe:
-      'Alle Anbieter laufen gegen deterministische Fixtures. Es wird nie behauptet, ein echter Anbieter sei verbunden.',
-  },
-  externalWritesEnabled: {
-    labelDe: 'Externe Schreibzugriffe',
-    envVar: 'EXTERNAL_WRITES_ENABLED',
-    explanationDe:
-      'Hauptschalter. Solange er aus ist, liefert jeder Adapter einen Dry-Run statt eines Schreibvorgangs — unabhängig von den spezifischeren Schaltern.',
-  },
-  metaMutationsEnabled: {
-    labelDe: 'Meta-Schreibzugriffe',
-    envVar: 'META_MUTATIONS_ENABLED',
-    explanationDe:
-      'Erlaubt das Anlegen pausierter Entwürfe und Budget-/Statusänderungen — nur zusammen mit dem Hauptschalter.',
-  },
-  metaCapiEnabled: {
-    labelDe: 'Conversions API',
-    envVar: 'META_CAPI_ENABLED',
-    explanationDe:
-      'Erlaubt den serverseitigen Ereignisversand an Meta — nur zusammen mit dem Hauptschalter.',
-  },
-  hubspotWritesEnabled: {
-    labelDe: 'HubSpot-Schreibzugriffe',
-    envVar: 'HUBSPOT_WRITES_ENABLED',
-    explanationDe:
-      'Erlaubt das Anlegen und Aktualisieren von Kontakten und Deals — nur zusammen mit dem Hauptschalter.',
-  },
-};
-
 function flagViews(flags: FeatureFlags): FeatureFlagView[] {
-  return (Object.keys(FLAG_LABELS_DE) as Array<keyof FeatureFlags>).map((key) => ({
+  return (Object.keys(FLAG_VIEW_TEXTS_DE) as Array<keyof FeatureFlags>).map((key) => ({
     key,
     value: flags[key],
-    labelDe: FLAG_LABELS_DE[key].labelDe,
-    envVar: FLAG_LABELS_DE[key].envVar,
-    explanationDe: FLAG_LABELS_DE[key].explanationDe,
+    ...FLAG_VIEW_TEXTS_DE[key],
   }));
 }
 
@@ -1750,7 +1576,7 @@ export function createFixtureOpsPort(): OpsPort {
       const result = await runTestLead(
         { mapping: state.mappingDraft, initiatedBy },
         {
-          provider: hubspotProviderInstance(current),
+          provider: hubspotProviderFor(current),
           store: createInMemorySyncStore(),
           flags: current,
         },
@@ -1781,7 +1607,7 @@ export function createFixtureOpsPort(): OpsPort {
       const report = await reconcile(
         { scope: 'HOURLY', mapping: state.mappingDraft },
         {
-          provider: hubspotProviderInstance(current),
+          provider: hubspotProviderFor(current),
           store: createInMemorySyncStore(),
           now: () => iso(0),
         },
@@ -1869,10 +1695,30 @@ export function createFixtureOpsPort(): OpsPort {
 let port: OpsPort | null = null;
 
 /**
- * The port the routes use. A single instance so fixture mutations survive
- * between requests within one server process.
+ * The single place fixture and repository are chosen for Heute, Library,
+ * Integrationen and Einstellungen.
+ *
+ * `resolveDatabase()` has already made this decision for the whole product, so
+ * the port follows it rather than reading `DEMO_MODE` a second time: `memory`
+ * means either demo mode or an unconfigured project, and in both cases the
+ * fixture is the honest implementation — there is no schema to read. `supabase`
+ * means the rows exist, and then the screens must show those and no others.
+ *
+ * Memoised because the fixture keeps its mutations in module scope and a server
+ * action and the render next to it have to see the same state. The live port is
+ * stateless, so memoising it costs nothing either way.
  */
 export function getOpsPort(): OpsPort {
-  port ??= createFixtureOpsPort();
+  if (port) return port;
+  const { db, mode } = resolveDatabase({ admin: true, demo: getFeatureFlags().demoMode });
+  port =
+    mode === 'memory'
+      ? createFixtureOpsPort()
+      : createLiveOpsPort({ db, workspaceId: CONSOLE_WORKSPACE_ID });
   return port;
+}
+
+/** Test seam: forgets the resolved port so the next call re-reads configuration. */
+export function resetOpsPort(): void {
+  port = null;
 }

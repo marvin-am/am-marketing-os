@@ -7,6 +7,7 @@ import {
   type MemoryPortsState,
 } from '@am/jobs';
 import { logger } from '@am/observability';
+import { CONSOLE_WORKSPACE_ID, workspaceResolver } from './workspace';
 
 /**
  * Composition root for background jobs.
@@ -133,11 +134,29 @@ async function loadPublishedMapping(): Promise<unknown | null> {
     return FIXTURE_MAPPING;
   }
 
+  /*
+   * `hubspot_mappings` stores `field_map`, `stage_map`, `pipeline_id` and the
+   * version chain — not the wizard's mapping document, which additionally
+   * describes deal creation, stage events, revenue, VQ, acquisition and
+   * webhooks. There is no column for it, so the console's publish path refuses
+   * rather than accepting a change that would vanish on reload, and this read
+   * has nothing to return. It was reading `row.mapping`, a column that has
+   * never existed, so it silently answered `null` for the wrong reason: not
+   * "none published" but "cannot be loaded".
+   *
+   * Until the document has a home, a live database has no published mapping by
+   * construction, and the launch gate stays closed — which is the correct
+   * outcome, reached honestly.
+   */
   const row = await db.hubspot.getActiveMapping(
-    jobEnvironment().workspaceId as never,
+    (await resolveJobWorkspaceId()) as never,
     'deal' as never,
   );
-  return (row as { mapping?: unknown } | null)?.mapping ?? null;
+  if (!row) return null;
+  logger.warn('hubspot.mapping_document_not_persisted', {
+    reason: 'hubspot_mappings has no column for the wizard document',
+  });
+  return null;
 }
 
 export function jobEnvironment() {
@@ -145,6 +164,27 @@ export function jobEnvironment() {
     environment: getAppConfig().environment,
     flags: getFeatureFlags(),
     // Single-workspace product; the column exists so isolation is mechanical.
-    workspaceId: '00000000-0000-4000-8000-000000000001',
+    workspaceId: CONSOLE_WORKSPACE_ID,
   };
+}
+
+/**
+ * The workspace the jobs write into.
+ *
+ * A constant is wrong against a real database and fails in the quietest way
+ * there is: every `performance_rollups` insert violates its foreign key, the
+ * job reports the rows it tried to write, and the dashboards that read those
+ * rollups stay empty with nothing anywhere saying why. Reproduced — the key
+ * `00000000-…-0001` is not present in `workspaces`, which holds the seeded row
+ * under the slug `am`.
+ *
+ * So the id is resolved from that slug, exactly as the console's ports resolve
+ * it, and the constant survives only as the answer for a database with no
+ * workspace at all — where reads legitimately return nothing.
+ */
+export async function resolveJobWorkspaceId(): Promise<string> {
+  const { resolveDatabase } = await import('@am/db');
+  const { db, mode } = resolveDatabase({ admin: true });
+  if (mode === 'memory') return CONSOLE_WORKSPACE_ID;
+  return workspaceResolver(db, CONSOLE_WORKSPACE_ID)();
 }

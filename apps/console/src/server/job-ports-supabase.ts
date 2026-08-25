@@ -4,7 +4,7 @@ import { asId } from '@am/domain';
 import { resolveDatabase, type AmDatabase } from '@am/db';
 import type { AbandonableFormInstance, JobPorts, LockPort, OutboxClaim } from '@am/jobs';
 import { logger } from '@am/observability';
-import { jobEnvironment } from './job-runtime';
+import { resolveJobWorkspaceId } from './job-runtime';
 
 /**
  * Supabase-backed implementations of the job ports.
@@ -14,9 +14,9 @@ import { jobEnvironment } from './job-runtime';
  * Jobs run without a user session and legitimately read across the workspace,
  * so they use the admin client — this module is server-only.
  */
-export function createSupabaseJobPorts(): JobPorts {
+export async function createSupabaseJobPorts(): Promise<JobPorts> {
   const { db } = resolveDatabase({ admin: true });
-  const workspaceId = asId<Uuid>(jobEnvironment().workspaceId);
+  const workspaceId = asId<Uuid>(await resolveJobWorkspaceId());
 
   return {
     lock: createAdvisoryLock(db),

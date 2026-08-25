@@ -78,6 +78,29 @@ export interface TrackingRepository {
   updateFormInstance(id: Uuid, patch: Updatable<FormInstanceRow>): Promise<FormInstanceRow>;
   /** Open instances idle for longer than the window — the abandon job's input. */
   listAbandonCandidates(workspaceId: Uuid, idleSince: string): Promise<FormInstanceRow[]>;
+
+  /**
+   * One instance by id. The funnel runtime reads it before every step update so
+   * `steps_completed` can move forward without a read-modify-write race turning
+   * a replayed beacon into a second completed step.
+   *
+   * Optional on the interface, like `findFormInstance`: `createMemoryDatabase()`
+   * serves DEMO_MODE, where the funnel runtime uses its own fixture store and
+   * never reaches either read.
+   */
+  getFormInstance?(id: Uuid): Promise<FormInstanceRow | null>;
+  /**
+   * The instance a (visitor, session, form version) already has, newest first.
+   *
+   * `form_instances` carries no unique index over that triple, so re-opening an
+   * instance is a lookup rather than an upsert. Without it a reload forks the
+   * funnel into two instances and doubles every step-level metric.
+   */
+  findFormInstance?(
+    visitorId: Uuid,
+    sessionId: Uuid,
+    formVersionId: Uuid,
+  ): Promise<FormInstanceRow | null>;
 }
 
 export class SupabaseTrackingRepository extends SupabaseRepository implements TrackingRepository {
@@ -156,6 +179,32 @@ export class SupabaseTrackingRepository extends SupabaseRepository implements Tr
     );
     if (!row) throw new DomainError('NOT_FOUND', { details: { context: 'tracking.updateFormInstance', id } });
     return row;
+  }
+
+  getFormInstance(id: Uuid): Promise<FormInstanceRow | null> {
+    return this.selectMaybe<FormInstanceRow>(
+      this.client.from('form_instances').select('*').eq('id', id).maybeSingle(),
+      'tracking.getFormInstance',
+    );
+  }
+
+  async findFormInstance(
+    visitorId: Uuid,
+    sessionId: Uuid,
+    formVersionId: Uuid,
+  ): Promise<FormInstanceRow | null> {
+    const rows = await this.selectList<FormInstanceRow>(
+      this.client
+        .from('form_instances')
+        .select('*')
+        .eq('visitor_id', visitorId)
+        .eq('session_id', sessionId)
+        .eq('form_version_id', formVersionId)
+        .order('started_at')
+        .limit(1),
+      'tracking.findFormInstance',
+    );
+    return rows[0] ?? null;
   }
 
   listAbandonCandidates(workspaceId: Uuid, idleSince: string): Promise<FormInstanceRow[]> {

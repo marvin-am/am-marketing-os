@@ -64,6 +64,20 @@ export interface OutboxRepository {
    */
   getByEventId(destination: OutboxDestination, eventId: string): Promise<OutboxEventRow | null>;
   stats(workspaceId: Uuid): Promise<OutboxStats>;
+  /**
+   * Every dispatch queued for one submission, oldest first.
+   *
+   * `list` is workspace-scoped because that is how the console reads the queue.
+   * The funnel runtime and the runbook start from a submission and hold no
+   * workspace id, and making `workspaceId` optional on `OutboxListParams` would
+   * turn a mandatory tenant filter into an optional one for every caller — so
+   * this is a separate, narrower read rather than a widening of that one.
+   *
+   * Optional on the interface: `createMemoryDatabase()` exists for DEMO_MODE,
+   * where the funnel runtime serves from its own fixture store and never
+   * reaches this read.
+   */
+  listBySubmission?(submissionId: Uuid): Promise<OutboxEventRow[]>;
 }
 
 export class SupabaseOutboxRepository extends SupabaseRepository implements OutboxRepository {
@@ -157,6 +171,17 @@ export class SupabaseOutboxRepository extends SupabaseRepository implements Outb
       'outbox.getByEventId',
     );
     return rows[0] ?? null;
+  }
+
+  listBySubmission(submissionId: Uuid): Promise<OutboxEventRow[]> {
+    return this.selectList<OutboxEventRow>(
+      this.client
+        .from('outbox_events')
+        .select('*')
+        .eq('submission_id', submissionId)
+        .order('created_at'),
+      'outbox.listBySubmission',
+    );
   }
 
   async stats(workspaceId: Uuid): Promise<OutboxStats> {

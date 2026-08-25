@@ -3,7 +3,7 @@ import { PageHeader, Section } from '@am/ui';
 import { ExperimentList } from '@/components/analytics/experiment-list';
 import { requireUser } from '@/lib/action';
 import { formatNumber } from '@/lib/format';
-import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
+import { getAnalyticsPort } from '@/server/analytics-factory';
 
 /**
  * Experimente — every test with its verdict, told honestly.
@@ -17,7 +17,7 @@ export default async function ExperimentsPage(): Promise<React.JSX.Element> {
   await requireUser('campaign.read');
 
   const now = new Date().toISOString();
-  const port = createAnalyticsFixturePort({ now });
+  const port = getAnalyticsPort({ now });
   const experiments = await port.listExperiments(now);
 
   const running = experiments.filter((entry) => entry.experiment.state === 'RUNNING').length;

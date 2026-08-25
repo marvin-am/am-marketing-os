@@ -25,7 +25,7 @@ import {
 } from '@/components/analytics/experiment-verdict';
 import { requireUser } from '@/lib/action';
 import { formatCurrencyMinor, formatDate, formatDuration, formatNumber } from '@/lib/format';
-import { createAnalyticsFixturePort } from '@/server/analytics-fixtures';
+import { getAnalyticsPort } from '@/server/analytics-factory';
 
 function Detail({ labelDe, children }: { labelDe: string; children: React.ReactNode }) {
   return (
@@ -54,7 +54,7 @@ export default async function ExperimentDetailPage({
 
   const { id } = await params;
   const now = new Date().toISOString();
-  const port = createAnalyticsFixturePort({ now });
+  const port = getAnalyticsPort({ now });
   const detail = await port.getExperiment(id, now);
   if (!detail) notFound();
 
