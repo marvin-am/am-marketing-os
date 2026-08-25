@@ -479,7 +479,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         severity: 'MEDIUM',
       },
       {
-        id: 'approval-assets-q3',
+        id: 'approval-assets-elektro',
         kind: 'APPROVAL',
         titleDe: `Creatives freigeben – ${CAMPAIGNS.assetReview.nameDe}`,
         detailDe:
@@ -492,7 +492,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         severity: 'HIGH',
       },
       {
-        id: 'approval-strategy-handwerk',
+        id: 'approval-strategy-nachfolge',
         kind: 'APPROVAL',
         titleDe: `Strategie freigeben – ${CAMPAIGNS.strategyReview.nameDe}`,
         detailDe: 'Angle, Offer und Claims liegen zur Freigabe vor.',
@@ -517,7 +517,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         severity: 'HIGH',
       },
       {
-        id: 'recommendation-collect-more',
+        id: 'recommendation-collect-more-data',
         kind: 'RECOMMENDATION',
         titleDe: `Mehr Daten sammeln – ${CAMPAIGNS.paused.nameDe}`,
         detailDe:
@@ -530,7 +530,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         severity: 'LOW',
       },
       {
-        id: 'budget-warning-q3',
+        id: 'budget-warning-potenzialanalyse',
         kind: 'BUDGET_WARNING',
         titleDe: `Tagesbudget zu 92 % ausgeschöpft – ${CAMPAIGNS.live.nameDe}`,
         detailDe:
@@ -556,7 +556,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         severity: 'MEDIUM',
       },
       {
-        id: 'matured-sanierungsfahrplan',
+        id: 'matured-dachsanierung',
         kind: 'MATURED_RESULT',
         titleDe: `Ergebnisse reif – ${CAMPAIGNS.completed.nameDe} (Kohorte Juni)`,
         detailDe:
@@ -581,7 +581,7 @@ function buildToday(flags: FeatureFlags): TodaySnapshot {
         severity: 'LOW',
       },
       {
-        id: 'immature-q3',
+        id: 'immature-potenzialanalyse',
         kind: 'IMMATURE_COHORT',
         titleDe: `CRM-Kohorte noch unreif – ${CAMPAIGNS.live.nameDe}`,
         detailDe:

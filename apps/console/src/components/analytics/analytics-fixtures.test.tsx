@@ -99,6 +99,37 @@ describe('analytics fixture — performance', () => {
     expect(clamped.from >= '2025-02-01').toBe(true);
     expect(clamped.to).toBe('2026-08-25');
   });
+
+  it('answers a selection with no delivery without inventing zeros', async () => {
+    // A campaign that stopped delivering long before the selected window.
+    const range = rangeEndingNow(25);
+    const query = { range, campaignId: 'cmp-erstgespraech-2025', now: NOW };
+
+    const overview = await port.getPerformanceOverview(query);
+    expect(overview.total.counters.spendMinor).toBe(0);
+    // No impressions means no CTR — null, never 0 %.
+    expect(overview.total.metrics.ctr.value).toBeNull();
+    expect(overview.total.metrics.ctr.denominator).toBe(0);
+
+    const breakdowns = await port.getBreakdowns(query);
+    expect(breakdowns.every((breakdown) => breakdown.rows.length === 0)).toBe(true);
+
+    const dropOff = await port.getFunnelDropOff(query);
+    expect(dropOff.analysis.steps).toHaveLength(0);
+    expect(dropOff.funnelVersionId).toBeNull();
+  });
+
+  it('answers the full 18-month range without expanding raw events', async () => {
+    const range = rangeEndingNow(540);
+    const started = Date.now();
+    const overview = await port.getPerformanceOverview({ range, now: NOW });
+    const breakdowns = await port.getBreakdowns({ range, now: NOW });
+
+    expect(overview.series).toHaveLength(540);
+    expect(breakdowns.every((breakdown) => breakdown.rows.length > 0)).toBe(true);
+    // A page request must not spend seconds on aggregation.
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
 });
 
 describe('analytics fixture — experiments', () => {

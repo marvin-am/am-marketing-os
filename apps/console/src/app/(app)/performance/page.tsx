@@ -35,6 +35,7 @@ const DELIVERY_METRICS: readonly MetricKey[] = [
 const FUNNEL_METRICS: readonly MetricKey[] = [
   'funnel_sessions',
   'form_start_rate',
+  'step_dropoff',
   'leads',
   'submission_rate',
   'cpl',
@@ -43,11 +44,15 @@ const FUNNEL_METRICS: readonly MetricKey[] = [
 /** CRM-delayed metrics. Everything here is qualified by the notice above it. */
 const BUSINESS_METRICS: readonly MetricKey[] = [
   'vq_scheduled',
+  'vq_scheduled_rate',
   'show_rate',
   'qualified_vq',
+  'qualified_vq_rate',
   'cost_per_qualified_vq',
   'opportunities',
+  'opportunity_rate',
   'closed_won',
+  'close_rate',
   'cac',
   'revenue',
   'roas',
