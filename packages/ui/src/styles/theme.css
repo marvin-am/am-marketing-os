@@ -1,0 +1,374 @@
+/*
+ * @am/ui — A&M Marketing OS design tokens.
+ *
+ * Import once per app, before any other stylesheet:
+ *
+ *     @import "@am/ui/styles/theme.css";
+ *
+ * Three layers, in order:
+ *
+ *   1. `:root` / `.dark` raw custom properties (`--am-*`). This is the only
+ *      place a literal colour is written. A brand profile may override any of
+ *      them at runtime (inline `style`, a `<style>` block, a data attribute)
+ *      without rebuilding CSS.
+ *   2. `@theme inline` maps the raw properties onto Tailwind's token
+ *      namespaces so `bg-surface`, `text-muted-foreground`, `rounded-lg`,
+ *      `shadow-md` … exist as utilities. `inline` keeps the `var()` reference
+ *      in the generated utility, which is what makes (1) work at runtime.
+ *   3. `@layer base` sets the few global defaults the console relies on:
+ *      colour scheme, focus rings, minimum control size.
+ *
+ * Never hard-code a hex value in a component. Add a token here instead.
+ */
+
+@import 'tailwindcss';
+
+/* Dark mode is class driven (`<html class="dark">`), never media driven, so a
+   brand profile can pin a fixed appearance for screenshots and PDF exports. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* -------------------------------------------------------------------------- */
+/* 1. Raw tokens                                                              */
+/* -------------------------------------------------------------------------- */
+
+:root {
+  /* --- Brand ------------------------------------------------------------ */
+  /* A&M red. Overriding `--am-brand-600` alone re-brands buttons, focus
+     rings and active navigation; override the whole ramp for a full swap. */
+  --am-brand-50: #fef2f3;
+  --am-brand-100: #fde3e5;
+  --am-brand-200: #fbcbd0;
+  --am-brand-300: #f7a3ab;
+  --am-brand-400: #f17280;
+  --am-brand-500: #e63e51;
+  --am-brand-600: #d7182a;
+  --am-brand-700: #b21122;
+  --am-brand-800: #93121f;
+  --am-brand-900: #7b141f;
+  --am-brand-950: #43050c;
+
+  --am-brand: var(--am-brand-600);
+  --am-brand-foreground: #ffffff;
+  --am-brand-subtle: var(--am-brand-50);
+  --am-brand-subtle-foreground: var(--am-brand-800);
+
+  /* --- Neutrals --------------------------------------------------------- */
+  --am-black: #0a0a0a;
+  --am-white: #ffffff;
+
+  --am-background: #ffffff;
+  --am-foreground: #0a0a0a;
+
+  --am-surface: #ffffff;
+  --am-surface-raised: #fafafa;
+  --am-surface-sunken: #f4f4f5;
+
+  --am-muted: #f4f4f5;
+  --am-muted-foreground: #62626b;
+
+  --am-border: #e4e4e7;
+  --am-border-strong: #d4d4d8;
+  --am-input: #d4d4d8;
+  --am-ring: var(--am-brand-600);
+
+  --am-overlay: rgb(10 10 10 / 0.45);
+
+  /* --- Roles ------------------------------------------------------------ */
+  --am-primary: var(--am-brand-600);
+  --am-primary-foreground: #ffffff;
+  --am-secondary: #f4f4f5;
+  --am-secondary-foreground: #18181b;
+  --am-accent: #f4f4f5;
+  --am-accent-foreground: #0a0a0a;
+
+  /* --- Semantic tones --------------------------------------------------- */
+  /* Every tone carries a text colour, a tinted surface and a border so a
+     state is legible without relying on hue alone (all badges also carry an
+     icon and a word). */
+  --am-destructive: #b3111f;
+  --am-destructive-foreground: #ffffff;
+  --am-destructive-surface: #fdecee;
+  --am-destructive-border: #f6c3c8;
+
+  --am-success: #0b6236;
+  --am-success-foreground: #ffffff;
+  --am-success-surface: #e7f5ec;
+  --am-success-border: #b9dfc8;
+
+  --am-warning: #8a5a00;
+  --am-warning-foreground: #ffffff;
+  --am-warning-surface: #fdf3e2;
+  --am-warning-border: #efd7a8;
+
+  --am-info: #1e4fa3;
+  --am-info-foreground: #ffffff;
+  --am-info-surface: #eaf1fd;
+  --am-info-border: #c3d5f5;
+
+  /* Neutral / "nothing happened yet" tone. */
+  --am-neutral: #52525b;
+  --am-neutral-foreground: #ffffff;
+  --am-neutral-surface: #f4f4f5;
+  --am-neutral-border: #e4e4e7;
+
+  /* --- Shape ------------------------------------------------------------ */
+  --am-radius: 0.5rem;
+
+  /* --- Elevation --------------------------------------------------------- */
+  /* Deliberately shallow. Depth comes from borders and surface steps. */
+  --am-shadow-xs: 0 1px 1px 0 rgb(10 10 10 / 0.04);
+  --am-shadow-sm: 0 1px 2px 0 rgb(10 10 10 / 0.06), 0 1px 1px -1px rgb(10 10 10 / 0.04);
+  --am-shadow-md: 0 4px 10px -2px rgb(10 10 10 / 0.08), 0 2px 4px -2px rgb(10 10 10 / 0.05);
+  --am-shadow-lg: 0 12px 28px -6px rgb(10 10 10 / 0.12), 0 4px 10px -4px rgb(10 10 10 / 0.06);
+  --am-shadow-xl: 0 24px 56px -12px rgb(10 10 10 / 0.2);
+
+  /* --- Type ------------------------------------------------------------- */
+  --am-font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --am-font-mono:
+    ui-monospace, 'SFMono-Regular', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --am-brand: var(--am-brand-500);
+  --am-brand-foreground: #ffffff;
+  --am-brand-subtle: #2a0b10;
+  --am-brand-subtle-foreground: var(--am-brand-300);
+
+  --am-background: #09090b;
+  --am-foreground: #fafafa;
+
+  --am-surface: #101012;
+  --am-surface-raised: #17171a;
+  --am-surface-sunken: #0d0d0f;
+
+  --am-muted: #1c1c1f;
+  --am-muted-foreground: #a1a1aa;
+
+  --am-border: #26262a;
+  --am-border-strong: #35353b;
+  --am-input: #35353b;
+  --am-ring: var(--am-brand-400);
+
+  --am-overlay: rgb(0 0 0 / 0.65);
+
+  --am-primary: var(--am-brand-600);
+  --am-primary-foreground: #ffffff;
+  --am-secondary: #1c1c1f;
+  --am-secondary-foreground: #fafafa;
+  --am-accent: #202024;
+  --am-accent-foreground: #fafafa;
+
+  --am-destructive: #f5808c;
+  --am-destructive-foreground: #2a0b10;
+  --am-destructive-surface: #2a1113;
+  --am-destructive-border: #5c1e24;
+
+  --am-success: #6fd39b;
+  --am-success-foreground: #062514;
+  --am-success-surface: #0f2419;
+  --am-success-border: #1e4a33;
+
+  --am-warning: #e8b45c;
+  --am-warning-foreground: #2a1c02;
+  --am-warning-surface: #2a2010;
+  --am-warning-border: #574122;
+
+  --am-info: #8ab4f8;
+  --am-info-foreground: #0a1a33;
+  --am-info-surface: #121c2e;
+  --am-info-border: #263c5e;
+
+  --am-neutral: #d4d4d8;
+  --am-neutral-foreground: #0a0a0a;
+  --am-neutral-surface: #1c1c1f;
+  --am-neutral-border: #35353b;
+
+  --am-shadow-xs: 0 1px 1px 0 rgb(0 0 0 / 0.4);
+  --am-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --am-shadow-md: 0 4px 10px -2px rgb(0 0 0 / 0.55);
+  --am-shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.6);
+  --am-shadow-xl: 0 24px 56px -12px rgb(0 0 0 / 0.7);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 2. Tailwind token namespaces                                               */
+/* -------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-brand-50: var(--am-brand-50);
+  --color-brand-100: var(--am-brand-100);
+  --color-brand-200: var(--am-brand-200);
+  --color-brand-300: var(--am-brand-300);
+  --color-brand-400: var(--am-brand-400);
+  --color-brand-500: var(--am-brand-500);
+  --color-brand-600: var(--am-brand-600);
+  --color-brand-700: var(--am-brand-700);
+  --color-brand-800: var(--am-brand-800);
+  --color-brand-900: var(--am-brand-900);
+  --color-brand-950: var(--am-brand-950);
+
+  --color-brand: var(--am-brand);
+  --color-brand-foreground: var(--am-brand-foreground);
+  --color-brand-subtle: var(--am-brand-subtle);
+  --color-brand-subtle-foreground: var(--am-brand-subtle-foreground);
+
+  --color-background: var(--am-background);
+  --color-foreground: var(--am-foreground);
+  --color-surface: var(--am-surface);
+  --color-surface-raised: var(--am-surface-raised);
+  --color-surface-sunken: var(--am-surface-sunken);
+
+  --color-muted: var(--am-muted);
+  --color-muted-foreground: var(--am-muted-foreground);
+
+  --color-border: var(--am-border);
+  --color-border-strong: var(--am-border-strong);
+  --color-input: var(--am-input);
+  --color-ring: var(--am-ring);
+  --color-overlay: var(--am-overlay);
+
+  --color-primary: var(--am-primary);
+  --color-primary-foreground: var(--am-primary-foreground);
+  --color-secondary: var(--am-secondary);
+  --color-secondary-foreground: var(--am-secondary-foreground);
+  --color-accent: var(--am-accent);
+  --color-accent-foreground: var(--am-accent-foreground);
+
+  --color-destructive: var(--am-destructive);
+  --color-destructive-foreground: var(--am-destructive-foreground);
+  --color-destructive-surface: var(--am-destructive-surface);
+  --color-destructive-border: var(--am-destructive-border);
+
+  --color-success: var(--am-success);
+  --color-success-foreground: var(--am-success-foreground);
+  --color-success-surface: var(--am-success-surface);
+  --color-success-border: var(--am-success-border);
+
+  --color-warning: var(--am-warning);
+  --color-warning-foreground: var(--am-warning-foreground);
+  --color-warning-surface: var(--am-warning-surface);
+  --color-warning-border: var(--am-warning-border);
+
+  --color-info: var(--am-info);
+  --color-info-foreground: var(--am-info-foreground);
+  --color-info-surface: var(--am-info-surface);
+  --color-info-border: var(--am-info-border);
+
+  --color-neutral-tone: var(--am-neutral);
+  --color-neutral-tone-foreground: var(--am-neutral-foreground);
+  --color-neutral-tone-surface: var(--am-neutral-surface);
+  --color-neutral-tone-border: var(--am-neutral-border);
+
+  --radius-xs: calc(var(--am-radius) - 4px);
+  --radius-sm: calc(var(--am-radius) - 2px);
+  --radius-md: var(--am-radius);
+  --radius-lg: calc(var(--am-radius) + 2px);
+  --radius-xl: calc(var(--am-radius) + 6px);
+  --radius-2xl: calc(var(--am-radius) + 12px);
+
+  --shadow-xs: var(--am-shadow-xs);
+  --shadow-sm: var(--am-shadow-sm);
+  --shadow-md: var(--am-shadow-md);
+  --shadow-lg: var(--am-shadow-lg);
+  --shadow-xl: var(--am-shadow-xl);
+
+  --font-sans: var(--am-font-sans);
+  --font-mono: var(--am-font-mono);
+
+  /* Minimum interactive size (WCAG 2.2 target size, AA). */
+  --spacing-touch: 2.75rem;
+
+  --animate-am-in: am-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-am-out: am-out 110ms ease-in;
+  --animate-am-shimmer: am-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes am-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes am-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes am-shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 3. Base layer                                                              */
+/* -------------------------------------------------------------------------- */
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings:
+      'cv02',
+      'cv03',
+      'cv04',
+      'cv11';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One focus treatment for the whole product: a 2px brand ring with a
+     background-coloured offset so it stays visible on tinted surfaces. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-brand);
+    color: var(--color-brand-foreground);
+  }
+
+  [data-am-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::after,
+    ::before {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
