@@ -25,7 +25,15 @@ const nextConfig: NextConfig = {
     '@am/jobs',
     '@am/observability',
   ],
-  serverExternalPackages: ['sharp'],
+  /*
+   * `pg` must not be bundled. `@am/db` loads the driver through `createRequire`
+   * so nothing tries to resolve it in a browser build, but in the server bundle
+   * `import.meta.url` resolves from `.next/server/…`, where pnpm's layout does
+   * not expose the package's own `node_modules`. Left alone, the Supabase health
+   * probe would report "driver unavailable" in production and never actually
+   * check the database it claims to check.
+   */
+  serverExternalPackages: ['sharp', 'pg'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },

@@ -43,6 +43,7 @@ export default async function StrategiePage({ params }: { params: Promise<{ id: 
                   to: option.to,
                   run: advanceCampaign,
                   permitted: can(user, 'campaign.edit'),
+                  approvalsMet: header.allowedTransitions.includes(option.to),
                 }
               : undefined
           }

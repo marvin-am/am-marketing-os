@@ -44,6 +44,7 @@ export default async function TestplanPage({ params }: { params: Promise<{ id: s
                   to: option.to,
                   run: advanceCampaign,
                   permitted: can(user, 'campaign.edit'),
+                  approvalsMet: header.allowedTransitions.includes(option.to),
                 }
               : undefined
           }

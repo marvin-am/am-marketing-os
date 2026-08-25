@@ -34,6 +34,9 @@ describe('ApprovalPanel — content-hash invalidation', () => {
           to: 'READY_FOR_LAUNCH_QA',
           run: vi.fn(async () => actionOk(header)),
           permitted: true,
+          /* Same reason as above: an invalidated strategy approval takes
+             READY_FOR_LAUNCH_QA out of the allowed transitions. */
+          approvalsMet: false,
         }}
       />,
     );
@@ -61,12 +64,61 @@ describe('ApprovalPanel — content-hash invalidation', () => {
         canDecide
         requiredRoleDe="Marketing Lead"
         decide={vi.fn(async () => actionOk(status))}
-        advance={{ labelDe: 'Weiter zur Launch-QA', to: 'READY_FOR_LAUNCH_QA', run, permitted: true }}
+        advance={{
+          labelDe: 'Weiter zur Launch-QA',
+          to: 'READY_FOR_LAUNCH_QA',
+          run,
+          permitted: true,
+          /* The strategy approval no longer covers the current content, and
+             READY_FOR_LAUNCH_QA requires it — so the port does not list the
+             target among the allowed transitions. */
+          approvalsMet: false,
+        }}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Weiter zur Launch-QA' }));
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('does not require the panel\u2019s own approval when the step does not', async () => {
+    /*
+     * The paused-draft step is rendered inside the PUBLISH approval panel,
+     * which made it wait for a publication approval that
+     * `REQUIRED_APPROVALS_FOR_STATE` never asks for — the section's own
+     * description says the opposite, that the draft is created and stays
+     * paused until publication is approved. Which panel a step is rendered in
+     * is layout; what it requires is a domain fact, and only the second one
+     * may disable the button.
+     */
+    const { status, header } = await strategyApproval(FIXTURE_CAMPAIGN_IDS.metaDraft);
+    const pending: typeof status = {
+      ...status,
+      kind: 'PUBLISH',
+      valid: false,
+      approval: { ...status.approval, kind: 'PUBLISH', state: 'PENDING' },
+    };
+
+    render(
+      <ApprovalPanel
+        campaignId={header.id}
+        status={pending}
+        canDecide
+        requiredRoleDe="Marketing Lead"
+        decide={vi.fn(async () => actionOk(pending))}
+        advance={{
+          labelDe: 'Pausierten Meta-Entwurf erstellen',
+          to: 'META_DRAFT_CREATED',
+          run: vi.fn(async () => actionOk(header)),
+          permitted: true,
+          approvalsMet: true,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Pausierten Meta-Entwurf erstellen' }),
+    ).toBeEnabled();
   });
 
   it('enables the advance action once the approval covers the current content', async () => {
@@ -85,6 +137,7 @@ describe('ApprovalPanel — content-hash invalidation', () => {
           to: 'READY_FOR_LAUNCH_QA',
           run: vi.fn(async () => actionOk(header)),
           permitted: true,
+          approvalsMet: true,
         }}
       />,
     );
@@ -134,6 +187,7 @@ describe('ApprovalPanel — content-hash invalidation', () => {
           to: 'LIVE',
           run: vi.fn(async () => actionOk(header)),
           permitted: true,
+          approvalsMet: true,
         }}
         rollback={{
           labelDe: 'Zurück auf „Bereit für Meta-Entwurf"',
@@ -186,6 +240,7 @@ describe('ApprovalPanel — content-hash invalidation', () => {
           to: 'META_DRAFT_CREATED',
           run,
           permitted: true,
+          approvalsMet: true,
           externalConfirm: { operation: 'meta.create_paused_draft_campaign', payload },
         }}
       />,
@@ -237,6 +292,7 @@ describe('ApprovalPanel — content-hash invalidation', () => {
             }),
           ),
           permitted: true,
+          approvalsMet: true,
           externalConfirm: { operation: 'meta.create_paused_draft_campaign', payload: {} },
         }}
       />,
@@ -271,6 +327,7 @@ describe('ApprovalPanel — content-hash invalidation', () => {
           to: 'READY_FOR_LAUNCH_QA',
           run,
           permitted: true,
+          approvalsMet: true,
         }}
       />,
     );

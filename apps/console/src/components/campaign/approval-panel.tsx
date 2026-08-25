@@ -46,6 +46,16 @@ export interface AdvanceDescriptor {
   run: (input: { campaignId: string; to: CampaignState }) => Promise<ActionResult<CampaignHeaderView>>;
   /** False when the operator's role does not allow this step. */
   permitted: boolean;
+  /**
+   * Whether the campaign's approvals actually permit this step, from
+   * `CampaignHeaderView.allowedTransitions` — the same
+   * `REQUIRED_APPROVALS_FOR_STATE` the server action re-checks. Passed in
+   * rather than inferred from the enclosing panel's own approval: the panel a
+   * step is rendered in is a layout decision, and the step's requirements are
+   * a domain fact. Conflating the two invented a publication approval that
+   * `READY_FOR_META_DRAFT` never asked for.
+   */
+  approvalsMet: boolean;
   /** German reason the step is unavailable for reasons other than permission. */
   blockedReasonDe?: string | null;
   /** Set for a step that writes to Meta; drives the confirmation dialog. */
@@ -142,7 +152,9 @@ export function ApprovalPanel({
   const stale = status.approval.state === 'APPROVED' && !status.valid;
   const invalid = stale || status.approval.state === 'INVALIDATED';
   const advanceBlocked =
-    !status.valid || Boolean(advance?.blockedReasonDe) || advance?.permitted === false;
+    advance?.approvalsMet === false ||
+    Boolean(advance?.blockedReasonDe) ||
+    advance?.permitted === false;
 
   return (
     <div className="flex flex-col gap-4">

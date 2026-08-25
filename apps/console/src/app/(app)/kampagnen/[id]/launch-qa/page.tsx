@@ -72,6 +72,7 @@ export default async function LaunchQaPage({ params }: { params: Promise<{ id: s
                     to: option.to,
                     run: option.publishing ? publishCampaign : advanceCampaign,
                     permitted: can(user, option.publishing ? 'campaign.publish' : 'campaign.edit'),
+                    approvalsMet: header.allowedTransitions.includes(option.to),
                     blockedReasonDe,
                     externalConfirm:
                       option.publishing && metaWrite

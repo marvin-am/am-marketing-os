@@ -45,6 +45,7 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
                   to: option.to,
                   run: advanceCampaign,
                   permitted: can(user, 'campaign.edit'),
+                  approvalsMet: header.allowedTransitions.includes(option.to),
                   blockedReasonDe,
                 }
               : undefined
