@@ -18,6 +18,10 @@ import { formatNumber } from '@/lib/format';
 import type { DailyPoint } from '@/server/analytics-port';
 import { ChartFrame } from './chart-frame';
 import {
+  VizTooltip,
+  type VizTooltipEntry,
+} from './chart-theme';
+import {
   AXIS_PROPS,
   formatAxisDay,
   formatAxisValue,
@@ -25,10 +29,8 @@ import {
   formatTooltipDay,
   GRID_PROPS,
   VIZ_SERIES,
-  VizTooltip,
-  type VizTooltipEntry,
   type VizUnit,
-} from './chart-theme';
+} from './chart-tokens';
 
 export interface TimeSeriesChartProps {
   titleDe: string;

@@ -32,6 +32,11 @@ import type { MetaProvider } from './provider';
 export interface MetaCredentials {
   appId: string | null;
   accessToken: string | null;
+  /**
+   * The Conversions API token, when it differs from the Marketing API one.
+   * Null means "use `accessToken`" — not "CAPI is unconfigured".
+   */
+  capiAccessToken: string | null;
   businessId: string | null;
   adAccountId: string | null;
   pageId: string | null;

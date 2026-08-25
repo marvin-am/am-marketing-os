@@ -52,10 +52,42 @@ export const SEED_FILE = join(HERE, '..', 'seed', 'seed.sql');
 const BOOTSTRAP_FILE = join(HERE, '..', '..', 'scripts', 'local-pg-bootstrap.sql');
 
 export const DATABASE_URL = process.env.DATABASE_URL ?? '';
-export const HAS_DATABASE = DATABASE_URL.length > 0;
+
+/**
+ * These suites do not merely read: `setupDatabase` issues `create database` and
+ * `drop database` on the server the URL points at. That is harmless against a
+ * throwaway Postgres and emphatically not harmless against the project in a
+ * developer's `.env.local`, which — once real credentials exist — is the
+ * production Supabase instance. Running `pnpm test` should never be able to
+ * create databases in production, so a remote host has to be opted into
+ * deliberately rather than inherited from whatever happens to be in the
+ * environment.
+ */
+function isLocalHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
+const ALLOW_REMOTE = process.env.ALLOW_REMOTE_TEST_DATABASE === 'true';
+const REMOTE_REFUSED = DATABASE_URL.length > 0 && !isLocalHost(DATABASE_URL) && !ALLOW_REMOTE;
+
+export const HAS_DATABASE = DATABASE_URL.length > 0 && !REMOTE_REFUSED;
 
 /** Printed once per skipped file so a green run is not mistaken for coverage. */
 export function announceSkip(fileLabel: string): void {
+  if (REMOTE_REFUSED) {
+    console.warn(
+      `[skip] ${fileLabel}: DATABASE_URL zeigt auf einen entfernten Host. Diese Tests legen ` +
+        `Datenbanken an und löschen sie wieder — gegen ein produktives Projekt wäre das ein Schaden. ` +
+        `Setzen Sie DATABASE_URL auf eine lokale Instanz, oder ALLOW_REMOTE_TEST_DATABASE=true, ` +
+        `wenn der Host wirklich eine Wegwerf-Instanz ist.`,
+    );
+    return;
+  }
   console.warn(
     `[skip] ${fileLabel}: DATABASE_URL ist nicht gesetzt — die Postgres-Integrationstests werden übersprungen. ` +
       `Setzen Sie DATABASE_URL auf eine erreichbare Postgres-Instanz, um sie auszuführen.`,

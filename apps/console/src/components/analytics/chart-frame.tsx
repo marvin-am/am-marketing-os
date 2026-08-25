@@ -3,7 +3,9 @@
 import * as React from 'react';
 import { ChartColumnBig } from 'lucide-react';
 import { EmptyState } from '@am/ui';
-import { VizStyles } from './chart-theme';
+import {
+  VizStyles,
+} from './chart-theme';
 
 export interface ChartFrameProps {
   /** German chart title. Names the plotted series, so one series needs no legend. */

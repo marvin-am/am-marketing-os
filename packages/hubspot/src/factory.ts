@@ -14,6 +14,13 @@ export interface CreateHubspotProviderOptions {
   /** Overrides the resolved mode. Used by tests and the demo seed. */
   mode?: ProviderMode;
   flags?: FeatureFlags;
+  /**
+   * Omit to read `HUBSPOT_PRIVATE_APP_TOKEN` from the environment; pass `null`
+   * to assert there is no token at all. The two are deliberately not the same:
+   * a caller that says "no token" and silently receives the ambient one is one
+   * step away from an unintended live call, and a test written that way passes
+   * or fails depending on whose machine it runs on.
+   */
   token?: string | null;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
@@ -46,7 +53,7 @@ export function createHubspotProvider(
     });
   }
 
-  const token = options.token ?? getHubspotToken();
+  const token = options.token === undefined ? getHubspotToken() : options.token;
   if (!token) {
     throw new DomainError('PROVIDER_NOT_CONFIGURED', {
       messageDe:

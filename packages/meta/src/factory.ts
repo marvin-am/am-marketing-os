@@ -34,6 +34,7 @@ export function getMetaCredentials(): MetaCredentials {
     return {
       appId: null,
       accessToken: null,
+      capiAccessToken: null,
       businessId: null,
       adAccountId: null,
       pageId: null,
@@ -47,6 +48,7 @@ export function getMetaCredentials(): MetaCredentials {
   return {
     appId: env.META_APP_ID,
     accessToken: env.META_ACCESS_TOKEN,
+    capiAccessToken: env.META_CAPI_ACCESS_TOKEN,
     businessId: null,
     adAccountId: env.META_AD_ACCOUNT_ID,
     pageId: env.META_PAGE_ID,
@@ -74,6 +76,7 @@ export function createMetaProvider(overrides: MetaProviderOverrides = {}): MetaP
   return new LiveMetaProvider({
     apiVersion: credentials.apiVersion,
     accessToken: credentials.accessToken ?? '',
+    capiAccessToken: credentials.capiAccessToken,
     adAccountId: credentials.adAccountId ?? '',
     appId: credentials.appId,
     appSecret: typeof window === 'undefined' ? getServerEnv().META_APP_SECRET : null,

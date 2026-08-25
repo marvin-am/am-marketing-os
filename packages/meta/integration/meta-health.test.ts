@@ -22,6 +22,7 @@ const NOW = '2026-06-30T10:00:00.000Z';
 const CONFIGURED: MetaCredentials = {
   appId: '1122334455',
   accessToken: 'fixture-token',
+  capiAccessToken: null,
   businessId: '210946325118804',
   adAccountId: FIXTURE_AD_ACCOUNT_ID,
   pageId: FIXTURE_PAGE_ID,
@@ -34,6 +35,7 @@ const CONFIGURED: MetaCredentials = {
 const UNCONFIGURED: MetaCredentials = {
   appId: null,
   accessToken: null,
+  capiAccessToken: null,
   businessId: null,
   adAccountId: null,
   pageId: null,

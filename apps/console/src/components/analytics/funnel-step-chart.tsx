@@ -7,15 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatNumber, formatRate, formatRateBasis } from '@/lib/format';
 import { ChartFrame } from './chart-frame';
 import {
+  VizLegend,
+  VizTooltip,
+  type VizTooltipEntry,
+} from './chart-theme';
+import {
   AXIS_PROPS,
   formatAxisValue,
   GRID_PROPS,
   VIZ_MUTED,
   VIZ_SERIES,
-  VizLegend,
-  VizTooltip,
-  type VizTooltipEntry,
-} from './chart-theme';
+} from './chart-tokens';
 
 export interface FunnelStepChartProps {
   steps: readonly FunnelStepAnalysis[];

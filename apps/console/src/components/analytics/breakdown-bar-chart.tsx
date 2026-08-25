@@ -16,13 +16,15 @@ import { formatCurrencyMinor, formatNumber } from '@/lib/format';
 import type { BreakdownRow } from '@/server/analytics-port';
 import { ChartFrame } from './chart-frame';
 import {
+  VizTooltip,
+  type VizTooltipEntry,
+} from './chart-theme';
+import {
   AXIS_PROPS,
   formatAxisValue,
   GRID_PROPS,
   VIZ_SERIES,
-  VizTooltip,
-  type VizTooltipEntry,
-} from './chart-theme';
+} from './chart-tokens';
 
 export interface BreakdownBarChartProps {
   titleDe: string;

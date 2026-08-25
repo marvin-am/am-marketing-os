@@ -136,6 +136,13 @@ export interface LiveProviderOptions {
   /** Pinned from config (`META_API_VERSION`). Never defaulted here. */
   apiVersion: string;
   accessToken: string;
+  /**
+   * Token for the Conversions API when it differs from the Marketing API one,
+   * which is the usual arrangement — a system user granted only
+   * `ads_management` on the dataset, with its own lifetime. Null means "reuse
+   * `accessToken`", never "CAPI is off"; that decision belongs to the flags.
+   */
+  capiAccessToken?: string | null;
   adAccountId: string;
   currency?: string;
   appId?: string | null;
@@ -159,6 +166,8 @@ interface CallOptions<S extends z.ZodType> {
   params?: Record<string, string | number | undefined | null>;
   form?: Record<string, string>;
   schema: S;
+  /** Overrides the Marketing API token. Only the CAPI dispatch sets it. */
+  accessToken?: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -203,8 +212,13 @@ export class LiveMetaProvider implements MetaProvider {
    * Meta requires `appsecret_proof` for server-side calls whenever the app is
    * configured to demand it: an HMAC-SHA256 of the access token keyed with the
    * app secret. Computed lazily so an app without a secret still works.
+   *
+   * The proof is over *the token being sent*, so it takes the token as an
+   * argument rather than reading `options.accessToken`: a CAPI dispatch signed
+   * with the Marketing API token would be rejected, and the error Meta returns
+   * for a mismatched proof does not say which of the two is wrong.
    */
-  private async appSecretProof(): Promise<string | null> {
+  private async appSecretProof(accessToken: string): Promise<string | null> {
     const secret = this.options.appSecret;
     if (!secret) return null;
     const key = await globalThis.crypto.subtle.importKey(
@@ -217,7 +231,7 @@ export class LiveMetaProvider implements MetaProvider {
     const signature = await globalThis.crypto.subtle.sign(
       'HMAC',
       key,
-      new TextEncoder().encode(this.options.accessToken),
+      new TextEncoder().encode(accessToken),
     );
     return Array.from(new Uint8Array(signature))
       .map((b) => b.toString(16).padStart(2, '0'))
@@ -225,7 +239,8 @@ export class LiveMetaProvider implements MetaProvider {
   }
 
   private async call<S extends z.ZodType>(options: CallOptions<S>): Promise<z.infer<S>> {
-    const proof = await this.appSecretProof();
+    const accessToken = options.accessToken ?? this.options.accessToken;
+    const proof = await this.appSecretProof(accessToken);
     const params = { ...(options.params ?? {}) };
     if (proof) params.appsecret_proof = proof;
 
@@ -239,7 +254,7 @@ export class LiveMetaProvider implements MetaProvider {
           const init: RequestInit = {
             method: options.method,
             headers: {
-              authorization: `Bearer ${this.options.accessToken}`,
+              authorization: `Bearer ${accessToken}`,
               accept: 'application/json',
               ...(options.form ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
             },
@@ -928,6 +943,7 @@ export class LiveMetaProvider implements MetaProvider {
           operation,
           form,
           schema: capiResponseSchema,
+          accessToken: this.options.capiAccessToken ?? this.options.accessToken,
         });
 
         return {

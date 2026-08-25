@@ -5,7 +5,12 @@ import { CircleCheckBig, CircleDashed } from 'lucide-react';
 import { formatCurrencyMinor, formatNumber, formatPercent } from '@/lib/format';
 import type { BreakdownRow, MetricSnapshot } from '@/server/analytics-port';
 import { BreakdownTable } from './breakdown-table';
-import { VIZ_SERIES, VizStyles } from './chart-theme';
+import {
+  VizStyles,
+} from './chart-theme';
+import {
+  VIZ_SERIES,
+} from './chart-tokens';
 
 /* -------------------------------------------------------------------------- */
 /* Credible interval                                                           */

@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   DEFAULT_EXPERIMENT_THRESHOLDS,
   DEFAULT_RECOMMENDATION_CONFIG,
@@ -9,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { actionOk, type ActionResult } from '@/lib/action-result';
 import type { SettingsSnapshot } from '@/server/ops-port';
 import { SettingsView, type SettingsViewProps } from './settings-view';
+import { SETTINGS_TABS, resolveSettingsTab, type SettingsTab } from './tabs';
 
 const AT = '2026-08-25T07:30:00.000Z';
 
@@ -78,17 +80,220 @@ const ok = async (): Promise<ActionResult<SettingsSnapshot>> => actionOk(snapsho
 
 function actions(): SettingsViewProps['actions'] {
   return {
-    saveMemberRoles: ok,
-    saveRoleBudgetLimit: ok,
-    saveApprovalThresholds: ok,
-    saveExperimentThresholds: ok,
-    saveRecommendationConfig: ok,
-    saveAttributionWindow: ok,
-    addConsentVersion: ok,
-    saveRetentionPolicy: ok,
-    saveBrandTokens: ok,
+    saveMemberRoles: vi.fn(ok),
+    saveRoleBudgetLimit: vi.fn(ok),
+    saveApprovalThresholds: vi.fn(ok),
+    saveExperimentThresholds: vi.fn(ok),
+    saveRecommendationConfig: vi.fn(ok),
+    saveAttributionWindow: vi.fn(ok),
+    addConsentVersion: vi.fn(ok),
+    saveRetentionPolicy: vi.fn(ok),
+    saveBrandTokens: vi.fn(ok),
   };
 }
+
+/**
+ * What each tab has to put on screen, and the controls that must reach a server
+ * action. Keyed by tab id so a tab added to `SETTINGS_TABS` without content
+ * fails here rather than shipping as an empty panel.
+ */
+const TAB_CONTENT: Record<
+  SettingsTab,
+  { headingDe: string; savesDe: readonly (keyof SettingsViewProps['actions'])[] }
+> = {
+  users: { headingDe: 'Nutzerinnen und Nutzer', savesDe: [] },
+  limits: { headingDe: 'Budgetbefugnisse je Rolle', savesDe: ['saveApprovalThresholds'] },
+  decisions: {
+    headingDe: 'Experiment-Schwellen',
+    savesDe: ['saveExperimentThresholds', 'saveRecommendationConfig', 'saveAttributionWindow'],
+  },
+  compliance: { headingDe: 'Einwilligungen', savesDe: ['saveRetentionPolicy'] },
+  brand: { headingDe: 'Marken-Tokens', savesDe: ['saveBrandTokens'] },
+  // Read-only by design: the safety rails are set in the environment.
+  flags: { headingDe: 'Feature-Flags', savesDe: [] },
+};
+
+const SAVE_LABELS_DE: Record<keyof SettingsViewProps['actions'], string> = {
+  saveMemberRoles: 'Rollen speichern',
+  saveRoleBudgetLimit: 'Limit speichern',
+  saveApprovalThresholds: 'Schwellen speichern',
+  saveExperimentThresholds: 'Schwellen speichern',
+  saveRecommendationConfig: 'Regeln speichern',
+  saveAttributionWindow: 'Fenster speichern',
+  addConsentVersion: 'Neue Version anlegen',
+  saveRetentionPolicy: 'Fristen speichern',
+  saveBrandTokens: 'Tokens speichern',
+};
+
+describe.each(SETTINGS_TABS.map((tab) => [tab.labelDe, tab] as const))(
+  'SettingsView — tab „%s“',
+  (_labelDe, tab) => {
+    const expected = TAB_CONTENT[tab.id];
+
+    it('is selected by its deep link and renders its section', () => {
+      render(
+        <SettingsView
+          snapshot={snapshot()}
+          canManageSettings
+          canManageUsers
+          defaultTab={resolveSettingsTab(tab.id)}
+          actions={actions()}
+        />,
+      );
+
+      expect(screen.getByRole('tab', { name: tab.labelDe })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      const panel = screen.getByRole('tabpanel');
+      expect(within(panel).getByRole('heading', { name: expected.headingDe })).toBeInTheDocument();
+      expect(panel.textContent?.trim().length ?? 0).toBeGreaterThan(0);
+    });
+
+    it('reaches a server action from every save control it offers', async () => {
+      const user = userEvent.setup();
+      const handlers = actions();
+      render(
+        <SettingsView
+          snapshot={snapshot()}
+          canManageSettings
+          canManageUsers
+          defaultTab={tab.id}
+          actions={handlers}
+        />,
+      );
+
+      const panel = screen.getByRole('tabpanel');
+      for (const key of expected.savesDe) {
+        await user.click(within(panel).getByRole('button', { name: SAVE_LABELS_DE[key] }));
+        expect(handlers[key]).toHaveBeenCalledTimes(1);
+      }
+
+      if (expected.savesDe.length === 0) {
+        // Users edits roles through a dialog and flags carry no control at all;
+        // both are asserted separately rather than pretended to be save buttons.
+        expect(within(panel).queryByRole('button', { name: /speichern/i })).not.toBeInTheDocument();
+      }
+    });
+  },
+);
+
+describe('SettingsView — two-step controls', () => {
+  it('saves a role budget limit through the inline editor', async () => {
+    const user = userEvent.setup();
+    const handlers = actions();
+    const { container } = render(
+      <SettingsView
+        snapshot={snapshot()}
+        canManageSettings
+        canManageUsers
+        defaultTab="limits"
+        actions={handlers}
+      />,
+    );
+
+    const row = container.querySelector('[data-role-limit="MARKETING_LEAD"]');
+    await user.click(within(row as HTMLElement).getByRole('button', { name: 'Ändern' }));
+    await user.click(screen.getByRole('button', { name: 'Limit speichern' }));
+
+    expect(handlers.saveRoleBudgetLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves member roles through the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const handlers = actions();
+    render(
+      <SettingsView
+        snapshot={snapshot()}
+        canManageSettings
+        canManageUsers
+        defaultTab="users"
+        actions={handlers}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rollen ändern' }));
+    await user.click(screen.getByRole('button', { name: 'Rollen speichern' }));
+
+    expect(handlers.saveMemberRoles).toHaveBeenCalledWith({
+      memberId: 'member-1',
+      roles: ['MARKETING_LEAD'],
+    });
+  });
+
+  it('creates a consent version through the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const handlers = actions();
+    render(
+      <SettingsView
+        snapshot={snapshot()}
+        canManageSettings
+        canManageUsers
+        defaultTab="compliance"
+        actions={handlers}
+      />,
+    );
+
+    const consentText = 'Ich willige in die Verarbeitung meiner Angaben zur Kontaktaufnahme ein.';
+    await user.type(screen.getByLabelText(/Einwilligungstext/), consentText);
+    await user.click(screen.getByRole('button', { name: 'Neue Version anlegen' }));
+    await user.click(screen.getByRole('button', { name: 'Version anlegen' }));
+
+    expect(handlers.addConsentVersion).toHaveBeenCalledWith({
+      textDe: consentText,
+      purposes: ['CONTACT'],
+      privacyPolicyUrl: 'https://am-beratung.de/datenschutz',
+    });
+  });
+});
+
+describe('SettingsView — tab strip', () => {
+  it('offers a trigger for every declared tab', () => {
+    render(
+      <SettingsView snapshot={snapshot()} canManageSettings canManageUsers actions={actions()} />,
+    );
+
+    const triggers = screen.getAllByRole('tab');
+    expect(triggers.map((trigger) => trigger.textContent)).toEqual(
+      SETTINGS_TABS.map((tab) => tab.labelDe),
+    );
+  });
+
+  it('switches panels when another tab is chosen', async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsView
+        snapshot={snapshot()}
+        canManageSettings
+        canManageUsers
+        defaultTab="users"
+        actions={actions()}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Marke' }));
+    expect(
+      within(screen.getByRole('tabpanel')).getByRole('heading', { name: 'Marken-Tokens' }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the default tab for an unknown deep link', () => {
+    render(
+      <SettingsView
+        snapshot={snapshot()}
+        canManageSettings
+        canManageUsers
+        defaultTab={resolveSettingsTab('gibt-es-nicht')}
+        actions={actions()}
+      />,
+    );
+
+    expect(screen.getByRole('tab', { name: 'Nutzer und Rollen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+});
 
 describe('SettingsView — retention', () => {
   it('renders every retention period as „nicht konfiguriert“ by default', () => {

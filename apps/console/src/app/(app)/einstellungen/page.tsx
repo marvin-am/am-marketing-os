@@ -1,5 +1,6 @@
 import { PageHeader } from '@am/ui';
-import { SETTINGS_TABS, SettingsView, type SettingsTab } from '@/components/settings/settings-view';
+import { SettingsView } from '@/components/settings/settings-view';
+import { resolveSettingsTab } from '@/components/settings/tabs';
 import { requireUser } from '@/lib/action';
 import { formatDateTime } from '@/lib/format';
 import { can } from '@/lib/permissions';
@@ -33,11 +34,8 @@ export default async function EinstellungenPage({
 }) {
   const user = await requireUser('campaign.read');
   const snapshot = await getOpsPort().loadSettings();
-  const requested = (await searchParams).tab;
   // Deep links from „Heute“ and the integrations pages point at one area.
-  const defaultTab: SettingsTab = SETTINGS_TABS.includes(requested as SettingsTab)
-    ? (requested as SettingsTab)
-    : 'users';
+  const defaultTab = resolveSettingsTab((await searchParams).tab);
 
   return (
     <div className="flex flex-col gap-8">

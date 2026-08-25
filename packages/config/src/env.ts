@@ -72,6 +72,14 @@ export const serverEnvSchema = z.object({
   META_APP_ID: optionalString,
   META_APP_SECRET: optionalString,
   META_ACCESS_TOKEN: optionalString,
+  /**
+   * The Conversions API is usually granted its own token, on a different
+   * lifetime from the Marketing API one. Kept separate rather than reused:
+   * folding them together means rotating one silently breaks the other, and
+   * the failure surfaces as lost conversions rather than as an auth error.
+   * Falls back to `META_ACCESS_TOKEN` when unset.
+   */
+  META_CAPI_ACCESS_TOKEN: optionalString,
   META_VERIFY_TOKEN: optionalString,
   META_AD_ACCOUNT_ID: optionalString,
   META_PAGE_ID: optionalString,

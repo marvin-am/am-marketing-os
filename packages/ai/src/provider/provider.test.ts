@@ -1,5 +1,6 @@
 import { isDomainError } from '@am/domain';
-import { describe, expect, it } from 'vitest';
+import { resetConfigCache } from '@am/config';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { FixtureEmbeddingProvider } from './fixture-embedding';
 import { FixtureImageProvider } from './fixture-image';
@@ -539,8 +540,26 @@ describe('OpenAiEmbeddingProvider', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('provider factory', () => {
-  it('selects fixtures in demo mode and memoises the choice', () => {
+  /**
+   * Demo mode is stubbed rather than inherited. `isFixtureMode()` reads
+   * `DEMO_MODE`, which defaults to true — so an inherited environment made this
+   * test assert the developer's shell instead of the product, and it flipped to
+   * red the moment a real `.env.local` with `DEMO_MODE=false` was present.
+   * A test whose verdict depends on whose machine runs it is not a gate.
+   */
+  beforeEach(() => {
+    vi.stubEnv('DEMO_MODE', 'true');
+    resetConfigCache();
     resetProviderCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetConfigCache();
+    resetProviderCache();
+  });
+
+  it('selects fixtures in demo mode and memoises the choice', () => {
     expect(isFixtureMode()).toBe(true);
 
     const text = getTextProvider();

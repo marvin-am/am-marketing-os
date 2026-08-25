@@ -15,6 +15,7 @@ import { CompliancePanel } from './compliance-panel';
 import { DecisionPanel } from './decision-panel';
 import { FeatureFlagsPanel } from './feature-flags-panel';
 import { LimitsPanel } from './limits-panel';
+import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, type SettingsTab } from './tabs';
 import { UsersPanel } from './users-panel';
 
 /**
@@ -23,17 +24,10 @@ import { UsersPanel } from './users-panel';
  * Every panel receives the same snapshot and hands back the snapshot the server
  * returned, so a change in one area is immediately visible in another — role
  * limits and approval thresholds in particular are read together.
+ *
+ * The tab identifiers and their labels come from `./tabs`, which the server
+ * component also reads to validate the `?tab=` deep link.
  */
-
-export const SETTINGS_TABS = [
-  'users',
-  'limits',
-  'decisions',
-  'compliance',
-  'brand',
-  'flags',
-] as const;
-export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 export interface SettingsViewProps {
   snapshot: SettingsSnapshot;
@@ -74,7 +68,7 @@ export function SettingsView({
   snapshot: initial,
   canManageSettings,
   canManageUsers,
-  defaultTab = 'users',
+  defaultTab = DEFAULT_SETTINGS_TAB,
   actions,
 }: SettingsViewProps) {
   const [snapshot, setSnapshot] = React.useState(initial);
@@ -86,12 +80,11 @@ export function SettingsView({
   return (
     <Tabs defaultValue={defaultTab}>
       <TabsList className="flex-wrap">
-        <TabsTrigger value="users">Nutzer und Rollen</TabsTrigger>
-        <TabsTrigger value="limits">Limits und Freigaben</TabsTrigger>
-        <TabsTrigger value="decisions">Entscheidungsregeln</TabsTrigger>
-        <TabsTrigger value="compliance">Einwilligung und Aufbewahrung</TabsTrigger>
-        <TabsTrigger value="brand">Marke</TabsTrigger>
-        <TabsTrigger value="flags">Feature-Flags</TabsTrigger>
+        {SETTINGS_TABS.map((tab) => (
+          <TabsTrigger key={tab.id} value={tab.id}>
+            {tab.labelDe}
+          </TabsTrigger>
+        ))}
       </TabsList>
 
       <TabsContent value="users">
