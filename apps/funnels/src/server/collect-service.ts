@@ -11,6 +11,7 @@ import {
   type RejectedEvent,
 } from '@am/tracking';
 import type { AppEnvironment, TrackingContext, TrafficKind } from '@am/domain';
+import { assignFunnelArm } from './assignment';
 import { logger } from '@am/observability';
 import type { FunnelStore } from './ports';
 
@@ -132,12 +133,20 @@ export async function collectEvents(
       : event,
   );
 
+  /* The collector discards every internal id a client claims, so the experiment
+     an exposure belongs to has to come from the server. It is recomputed here
+     from the visitor and the experiment's frozen salt: deterministic, and
+     therefore not something a forged request can steer. A claimed funnel
+     version is only ever used to *look up* a published funnel — never trusted
+     as the answer. */
+  const trusted = await resolveTrustedContext(owned, context, deps.store);
+
   const exposures = deps.exposures ?? defaultExposures;
   const result = ingestBatch(owned, {
     environment: context.environment,
     trafficKind: context.trafficKind,
     receivedAt: context.receivedAt,
-    trusted: context.trusted,
+    trusted,
     dedupe: deps.dedupe ?? defaultDedupe,
     limiter: deps.limiter,
     rateLimitKey: context.rateLimitKey,
@@ -147,7 +156,14 @@ export async function collectEvents(
   let suppressedExposures = 0;
   const storable = result.accepted.filter((event) => {
     if (event.event_type !== 'experiment_exposed') return true;
-    if (!event.experiment_id) return false;
+    /* No server-resolved experiment means the exposure names no published
+       funnel version we could bucket the visitor into — the arm the client
+       claimed was discarded upstream. Counted, not silently dropped, so the
+       response says an exposure did not survive. */
+    if (!event.experiment_id) {
+      suppressedExposures += 1;
+      return false;
+    }
 
     const decision = shouldRecordExposure({
       experimentId: event.experiment_id,
@@ -194,5 +210,59 @@ export async function collectEvents(
       rejected: result.rejected,
       suppressedExposures,
     },
+  };
+}
+
+
+/**
+ * Builds the trusted context for a batch.
+ *
+ * The verified launch token wins outright. Beyond it, one thing still has to be
+ * established server-side: which experiment arm an `experiment_exposed` event
+ * belongs to. Recomputing it from `visitorId` plus the experiment's frozen salt
+ * makes the arm unforgeable — the property experiment integrity actually
+ * depends on — even though the funnel version that leads us to the experiment
+ * was named by the client.
+ */
+async function resolveTrustedContext(
+  events: readonly unknown[],
+  context: CollectContext,
+  store: FunnelStore,
+): Promise<Partial<TrackingContext> | null> {
+  const base: Partial<TrackingContext> = { ...(context.trusted ?? {}) };
+
+  const needsExperiment = events.some(
+    (event) =>
+      typeof event === 'object' &&
+      event !== null &&
+      (event as { event_type?: unknown }).event_type === 'experiment_exposed',
+  );
+  if (!needsExperiment) return context.trusted;
+
+  const funnelVersionId =
+    base.funnel_version_id ??
+    events.reduce<string | null>((found, event) => {
+      if (found) return found;
+      if (typeof event !== 'object' || event === null) return null;
+      const claimed = (event as { funnel_version_id?: unknown }).funnel_version_id;
+      return typeof claimed === 'string' ? claimed : null;
+    }, null);
+
+  if (!funnelVersionId) return context.trusted;
+
+  const version = await store.loadFunnelVersion(funnelVersionId);
+  // Only a published version may carry production traffic; a draft that leaked
+  // into a request is not a funnel anyone was actually shown.
+  if (!version || version.state !== 'PUBLISHED') return context.trusted;
+
+  const assignment = assignFunnelArm(version.experiment, context.visitorId);
+  if (!assignment) return context.trusted;
+
+  return {
+    ...base,
+    funnel_id: version.funnelId,
+    funnel_version_id: version.funnelVersionId,
+    experiment_id: assignment.experimentId,
+    experiment_arm_id: assignment.armId,
   };
 }

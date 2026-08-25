@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { FORBIDDEN_EVENT_KEYS } from '@am/domain';
+import { FORBIDDEN_EVENT_KEYS, FORBIDDEN_EVENT_KEY_FRAGMENTS, FORBIDDEN_EVENT_KEYS_EXACT } from '@am/domain';
 import {
   assertNoClientPii,
   CLIENT_FORBIDDEN_KEYS,
+  CLIENT_FORBIDDEN_KEY_FRAGMENTS,
+  CLIENT_FORBIDDEN_KEYS_EXACT,
   createTracker,
   findClientPiiViolations,
   type QueuedEvent,
@@ -31,8 +33,23 @@ function collect() {
 }
 
 describe('client-side PII guard', () => {
-  it('mirrors the domain key list exactly', () => {
+  it('mirrors the domain key lists exactly', () => {
+    // The beacon keeps its own copy so the funnel bundle stays Zod-free; this
+    // is what stops the two drifting.
     expect([...CLIENT_FORBIDDEN_KEYS]).toEqual([...FORBIDDEN_EVENT_KEYS]);
+    expect([...CLIENT_FORBIDDEN_KEY_FRAGMENTS]).toEqual([...FORBIDDEN_EVENT_KEY_FRAGMENTS]);
+    expect([...CLIENT_FORBIDDEN_KEYS_EXACT]).toEqual([...FORBIDDEN_EVENT_KEYS_EXACT]);
+  });
+
+  it('matches key variants the way the domain does', () => {
+    expect(findClientPiiViolations({ phone_number: '123' })).toHaveLength(1);
+    expect(findClientPiiViolations({ emailAddress: 'x' })).toHaveLength(1);
+    // …without rejecting legitimate keys that merely contain an ambiguous word.
+    expect(findClientPiiViolations({ content_name: 'Potenzialanalyse' })).toEqual([]);
+  });
+
+  it('catches the German national phone format', () => {
+    expect(findClientPiiViolations({ v: '0151 23456789' })).toHaveLength(1);
   });
 
   it('flags e-mails, phone numbers and forbidden keys', () => {

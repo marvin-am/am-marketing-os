@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 process.env.LOG_LEVEL = 'error';
 
 import { createExposureRegistry, createMemoryDedupeStore, createRateLimiter } from '@am/tracking';
+import { assignFunnelArm } from './assignment';
 import { collectEvents, type CollectContext } from './collect-service';
+import { FIXTURE_FUNNEL_IDS } from './fixture-store';
 import { checkOrigin } from './origin';
 import { getFixtureStore, resetFunnelStore } from './store';
 
@@ -140,23 +142,75 @@ describe('server-owned identity', () => {
 });
 
 describe('experiment exposure', () => {
-  const exposure = () =>
+  /**
+   * A real exposure names the funnel version the visitor was served. The
+   * experiment and the arm are then recomputed server-side from that version's
+   * frozen salt — the client's own `experiment_id` / `experiment_arm_id` are
+   * discarded like every other internal id, so an exposure cannot be forged into
+   * an arm the visitor was never bucketed into.
+   */
+  const exposure = (overrides: Record<string, unknown> = {}) =>
     event({
       event_type: 'experiment_exposed',
-      experiment_id: EXPERIMENT_ID,
-      experiment_arm_id: ARM_ID,
+      funnel_version_id: FIXTURE_FUNNEL_IDS.formFunnelVersionA,
       step_id: null,
+      ...overrides,
     });
+
+  const storedExposures = () =>
+    getFixtureStore()
+      .snapshot()
+      .events.filter((stored) => stored.event_type === 'experiment_exposed');
 
   it('records one exposure per experiment, visitor and session', async () => {
     const shared = deps();
     await collectEvents({ events: [exposure()] }, context(), shared);
     await collectEvents({ events: [exposure()] }, context(), shared);
 
-    const exposures = getFixtureStore()
-      .snapshot()
-      .events.filter((stored) => stored.event_type === 'experiment_exposed');
-    expect(exposures).toHaveLength(1);
+    expect(storedExposures()).toHaveLength(1);
+  });
+
+  it('resolves the arm server-side rather than believing the payload', async () => {
+    const version = await getFixtureStore().loadFunnelVersion(
+      FIXTURE_FUNNEL_IDS.formFunnelVersionA,
+    );
+    const assigned = assignFunnelArm(version?.experiment ?? null, VISITOR_ID);
+    expect(assigned).not.toBeNull();
+
+    await collectEvents(
+      {
+        events: [exposure({ experiment_id: EXPERIMENT_ID, experiment_arm_id: ARM_ID })],
+      },
+      context(),
+      deps(),
+    );
+
+    const [stored] = storedExposures();
+    expect(stored?.experiment_id).toBe(assigned?.experimentId);
+    expect(stored?.experiment_arm_id).toBe(assigned?.armId);
+    expect(stored?.experiment_arm_id).not.toBe(ARM_ID);
+  });
+
+  it('drops an exposure that names no funnel version, so nothing can be forged', async () => {
+    const outcome = await collectEvents(
+      { events: [exposure({ funnel_version_id: null })] },
+      context(),
+      deps(),
+    );
+
+    expect(outcome.ok && outcome.body.suppressedExposures).toBe(1);
+    expect(storedExposures()).toHaveLength(0);
+  });
+
+  it('drops an exposure that names a draft version', async () => {
+    const outcome = await collectEvents(
+      { events: [exposure({ funnel_version_id: FIXTURE_FUNNEL_IDS.draftFunnelVersionId })] },
+      context(),
+      deps(),
+    );
+
+    expect(outcome.ok && outcome.body.suppressedExposures).toBe(1);
+    expect(storedExposures()).toHaveLength(0);
   });
 
   it('keeps non-production exposures out of the store entirely', async () => {

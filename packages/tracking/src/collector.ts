@@ -16,6 +16,7 @@ import {
   type TrackingEvent,
   type TrafficKind,
 } from '@am/domain';
+import { TRACKING_CONTEXT_KEYS, emptyTrackingContext } from './tokens';
 
 /**
  * Event ingestion.
@@ -62,6 +63,11 @@ export interface CollectorContext {
    * anything the payload claims — see `tokens.ts` for the trust rule.
    */
   trusted?: Partial<TrackingContext> | null;
+  /**
+   * Consent as the *server* knows it. The browser does not get to assert its
+   * own consent status — that is the whole point of recording consent.
+   */
+  consentStatus?: TrackingEvent['consent_status'];
   /** Test seam for `event_id` generation. */
   generateId?: () => string;
   /** In-process idempotency guard; the database unique index is the real one. */
@@ -107,13 +113,31 @@ export function normalizeEvent(input: unknown, ctx: CollectorContext): Result<Tr
     ? raw.event_id
     : generateId();
 
+  // Internal identifiers are server-owned. Everything the client claims for a
+  // field in the tracking context is discarded before the trusted values are
+  // applied — overlaying the token on top of the client's payload is not
+  // enough, because a field the token happens not to carry would keep whatever
+  // the browser sent.
+  //
+  // Without this, anyone could POST to the collector claiming any campaign,
+  // creative or experiment arm and have it stored as production traffic:
+  // inflating a campaign's sessions, skewing an experiment's denominators, and
+  // asserting GRANTED consent nobody gave.
+  const clientClaimed: Record<string, unknown> = { ...raw };
+  for (const key of TRACKING_CONTEXT_KEYS) delete clientClaimed[key];
+  delete clientClaimed.consent_status;
+
   const candidate: Record<string, unknown> = {
-    ...raw,
+    ...clientClaimed,
+    ...emptyTrackingContext(),
     event_id: eventId,
     event_schema_version: EVENT_SCHEMA_VERSION,
     received_at: ctx.receivedAt ?? nowIso(),
     environment: ctx.environment,
     traffic_kind: ctx.trafficKind,
+    // Consent is a server-side fact recorded at submission, never a browser
+    // assertion. An event may only report what the server already knows.
+    consent_status: ctx.consentStatus ?? 'UNKNOWN',
   };
 
   if (ctx.trusted) {

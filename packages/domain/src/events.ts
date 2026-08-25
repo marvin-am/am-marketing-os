@@ -195,34 +195,58 @@ export type TrackingEventInput = z.infer<typeof trackingEventInputSchema>;
 /* PII guard                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** Keys that must never appear anywhere in an analytics payload. */
-export const FORBIDDEN_EVENT_KEYS: readonly string[] = [
+/**
+ * Key fragments matched as a normalised **substring**.
+ *
+ * These are unambiguous: any key containing `email`, `phone` or `firstname`
+ * carries that datum, whatever the surrounding naming convention.
+ */
+export const FORBIDDEN_EVENT_KEY_FRAGMENTS: readonly string[] = [
   'email',
-  'e_mail',
-  'mail',
   'phone',
   'telefon',
   'telephone',
-  'first_name',
-  'firstname',
   'vorname',
-  'last_name',
-  'lastname',
   'nachname',
-  'name',
-  'full_name',
+  'firstname',
+  'lastname',
+  'fullname',
   'answers',
-  'answer',
   'antworten',
+];
+
+/**
+ * Keys matched **exactly** (after normalisation).
+ *
+ * `name` is the reason this second list exists: as a substring it also matches
+ * `content_name`, `campaign_name` and `event_name`, all of which are legitimate
+ * and none of which carry personal data. A guard that rejects valid events is a
+ * guard someone switches off, so ambiguous words are matched whole.
+ *
+ * Note the asymmetry with `AUDIT_REDACT_KEYS`, which matches broadly on
+ * purpose: over-redacting a log line costs a little debuggability, whereas
+ * over-rejecting an event costs real data.
+ */
+export const FORBIDDEN_EVENT_KEYS_EXACT: readonly string[] = [
+  'name',
+  'mail',
+  'ip',
+  'ipaddress',
+  'useragent',
   'message',
   'nachricht',
   'freitext',
   'address',
   'adresse',
   'street',
-  'ip',
-  'ip_address',
-  'user_agent',
+  'kontakt',
+  'answer',
+];
+
+/** Every forbidden key, for callers that just want the list. */
+export const FORBIDDEN_EVENT_KEYS: readonly string[] = [
+  ...FORBIDDEN_EVENT_KEY_FRAGMENTS,
+  ...FORBIDDEN_EVENT_KEYS_EXACT,
 ];
 
 /**
@@ -232,9 +256,8 @@ export const FORBIDDEN_EVENT_KEYS: readonly string[] = [
  */
 export function isForbiddenEventKey(key: string): boolean {
   const normalized = key.toLowerCase().replace(/[^a-z]/g, '');
-  return FORBIDDEN_EVENT_KEYS.some((forbidden) =>
-    normalized.includes(forbidden.replace(/[^a-z]/g, '')),
-  );
+  if (FORBIDDEN_EVENT_KEYS_EXACT.includes(normalized)) return true;
+  return FORBIDDEN_EVENT_KEY_FRAGMENTS.some((fragment) => normalized.includes(fragment));
 }
 
 const EMAIL_LIKE = /[\w.+-]+@[\w-]+\.[\w.-]+/;

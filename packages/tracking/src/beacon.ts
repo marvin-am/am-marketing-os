@@ -31,38 +31,70 @@ import type {
  * The authoritative guard is the server-side one in `collector.ts`; this is the
  * fail-fast that stops a mistake from ever leaving the browser.
  */
-export const CLIENT_FORBIDDEN_KEYS: readonly string[] = [
+/**
+ * Mirror of the domain key lists, kept local so the funnel bundle stays free of
+ * Zod. A test asserts both stay in step with `@am/domain`.
+ *
+ * Two lists, matched differently, for the same reason as in the domain: `name`
+ * as a substring also matches `content_name` and `event_name`, so ambiguous
+ * words are matched whole while unambiguous ones match anywhere in the key.
+ */
+export const CLIENT_FORBIDDEN_KEY_FRAGMENTS: readonly string[] = [
   'email',
-  'e_mail',
-  'mail',
   'phone',
   'telefon',
   'telephone',
-  'first_name',
-  'firstname',
   'vorname',
-  'last_name',
-  'lastname',
   'nachname',
-  'name',
-  'full_name',
+  'firstname',
+  'lastname',
+  'fullname',
   'answers',
-  'answer',
   'antworten',
+];
+
+export const CLIENT_FORBIDDEN_KEYS_EXACT: readonly string[] = [
+  'name',
+  'mail',
+  'ip',
+  'ipaddress',
+  'useragent',
   'message',
   'nachricht',
   'freitext',
   'address',
   'adresse',
   'street',
-  'ip',
-  'ip_address',
-  'user_agent',
+  'kontakt',
+  'answer',
 ];
 
+export const CLIENT_FORBIDDEN_KEYS: readonly string[] = [
+  ...CLIENT_FORBIDDEN_KEY_FRAGMENTS,
+  ...CLIENT_FORBIDDEN_KEYS_EXACT,
+];
+
+/** Same normalised matching as `isForbiddenEventKey` in `@am/domain`. */
+export function isClientForbiddenKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z]/g, '');
+  if (CLIENT_FORBIDDEN_KEYS_EXACT.includes(normalized)) return true;
+  return CLIENT_FORBIDDEN_KEY_FRAGMENTS.some((fragment) => normalized.includes(fragment));
+}
+
 const EMAIL_LIKE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
-const PHONE_LIKE = /(?:\+|00)\d[\d\s\-()]{7,}/;
+const PHONE_INTERNATIONAL = /(?:\+|\b00)\d[\d\s\-()/.]{6,}\d/;
+const PHONE_NATIONAL_DE = /(?:^|[^\d+])0\d[\d\s\-()/.]{7,}\d/;
 const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function looksLikePhone(value: string): boolean {
+  for (const pattern of [PHONE_INTERNATIONAL, PHONE_NATIONAL_DE]) {
+    const match = pattern.exec(value);
+    if (!match) continue;
+    const digits = match[0].replace(/\D/g, '');
+    if (digits.length >= 9 && digits.length <= 16) return true;
+  }
+  return false;
+}
 
 /** Paths in `payload` that look like personal data. Empty means clean. */
 export function findClientPiiViolations(payload: unknown, path = '$'): string[] {
@@ -73,7 +105,7 @@ export function findClientPiiViolations(payload: unknown, path = '$'): string[] 
 
     if (typeof value === 'string') {
       if (EMAIL_LIKE.test(value)) violations.push(`${currentPath} (E-Mail-Muster)`);
-      else if (PHONE_LIKE.test(value) && !UUID_LIKE.test(value)) {
+      else if (looksLikePhone(value) && !UUID_LIKE.test(value)) {
         violations.push(`${currentPath} (Telefonnummer-Muster)`);
       }
       return;
@@ -86,7 +118,7 @@ export function findClientPiiViolations(payload: unknown, path = '$'): string[] 
 
     if (typeof value === 'object') {
       for (const key of Object.keys(value as Record<string, unknown>)) {
-        if (CLIENT_FORBIDDEN_KEYS.includes(key.toLowerCase())) {
+        if (isClientForbiddenKey(key)) {
           violations.push(`${currentPath}.${key} (verbotener Schlüssel)`);
           continue;
         }
