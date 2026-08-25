@@ -10,4 +10,5 @@ export * from './fixture-embedding';
 export * from './fixture-content';
 export * from './fixture-bundle';
 export * from './factory';
+export * from './health';
 export { encodePngRgb, toBase64 } from './png';

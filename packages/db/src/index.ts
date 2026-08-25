@@ -10,6 +10,7 @@
  */
 export * from './types';
 export * from './client';
+export * from './health';
 export * from './errors';
 export * from './crypto';
 export * from './outbox';

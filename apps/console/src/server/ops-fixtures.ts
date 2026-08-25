@@ -1,4 +1,4 @@
-import { getFeatureFlags, isProviderConfigured, resolveProviderMode } from '@am/config';
+import { getFeatureFlags, resolveProviderMode } from '@am/config';
 import {
   DEFAULT_ATTRIBUTION_WINDOW_DAYS,
   DEFAULT_EXPERIMENT_THRESHOLDS,
@@ -6,10 +6,8 @@ import {
   DEFAULT_ROLE_BUDGET_LIMITS,
   UNCONFIGURED_RETENTION_POLICY,
   dryRun,
-  rollUpHealth,
   type ConsentVersion,
   type FeatureFlags,
-  type HealthCheck,
   type OutboxEvent,
   type Provider,
   type ProviderHealth,
@@ -17,6 +15,8 @@ import {
   type Role,
   type RoleBudgetLimit,
 } from '@am/domain';
+import { checkOpenAiHealth } from '@am/ai';
+import { checkSupabaseHealth } from '@am/db';
 import {
   FIXTURE_MAPPING,
   INCOMPLETE_FIXTURE_MAPPING,
@@ -78,9 +78,10 @@ import {
  *
  * What it models faithfully, because the screens assert it to the operator:
  *
- * - the Meta and HubSpot health panels come from the real probe functions in
- *   `@am/meta` / `@am/hubspot`, run against the packages' fixture providers, so
- *   `AWAITING_EXTERNAL_INPUT` shows up exactly where a credential is missing;
+ * - the health panels come from the real probe functions of the packages that
+ *   own each provider — `@am/meta`, `@am/hubspot`, `@am/ai` and `@am/db` — so
+ *   `AWAITING_EXTERNAL_INPUT` shows up exactly where a credential is missing and
+ *   `CONNECTED` only ever follows a provider that actually answered;
  * - a mapping is validated by `validateMapping` on every save, and publishing
  *   appends an immutable version rather than mutating the previous one;
  * - a write attempted while `EXTERNAL_WRITES_ENABLED=false` returns a
@@ -1035,95 +1036,19 @@ function buildLibrary(): LibrarySnapshot {
 /* Provider health                                                             */
 /* -------------------------------------------------------------------------- */
 
-function simpleCheck(
-  key: string,
-  labelDe: string,
-  status: HealthCheck['status'],
-  detailDe: string,
-  remediationDe: string | null,
-  blocksLiveOnly = false,
-): HealthCheck {
-  return { key, labelDe, status, detailDe, checkedAt: iso(0), remediationDe, blocksLiveOnly };
+/**
+ * OpenAI and Supabase are probed by their owning packages, exactly as Meta and
+ * HubSpot are. Neither reports a connection this file inferred from an
+ * environment variable: `checkOpenAiHealth` lists models, `checkSupabaseHealth`
+ * opens a connection and reads the catalogue, and each reports what it found.
+ * `now` is pinned to the fixture anchor so the snapshot stays deterministic.
+ */
+async function openAiHealth(): Promise<ProviderHealth> {
+  return checkOpenAiHealth({ now: iso(0) });
 }
 
-function openAiHealth(): ProviderHealth {
-  const configured = isProviderConfigured('OPENAI');
-  const checks: HealthCheck[] = [
-    simpleCheck(
-      'openai.api_key',
-      'API-Schlüssel hinterlegt',
-      configured ? 'PASS' : 'AWAITING_EXTERNAL_INPUT',
-      configured
-        ? 'Ein OpenAI-Schlüssel ist konfiguriert.'
-        : 'Es ist kein OpenAI-Schlüssel hinterlegt. Die Generierung läuft gegen den Fixture-Anbieter.',
-      configured ? null : 'OPENAI_API_KEY hinterlegen.',
-      true,
-    ),
-    simpleCheck(
-      'openai.structured_output',
-      'Strukturierte Ausgaben',
-      'PASS',
-      'Alle Prompts sind gegen ein JSON-Schema validiert. Freies Markup wird nie gespeichert oder ausgeliefert.',
-      null,
-    ),
-    simpleCheck(
-      'openai.budget',
-      'Kostenbegrenzung',
-      configured ? 'WARN' : 'AWAITING_EXTERNAL_INPUT',
-      configured
-        ? 'Es ist kein Monatslimit für Generierungskosten hinterlegt.'
-        : 'Ohne Schlüssel entstehen keine Kosten.',
-      configured ? 'Monatslimit in den Einstellungen festlegen.' : null,
-    ),
-  ];
-  return {
-    provider: 'OPENAI',
-    state: configured ? 'CONNECTED' : 'FIXTURE',
-    overall: rollUpHealth(checks),
-    checks,
-    checkedAt: iso(0),
-  };
-}
-
-function supabaseHealth(): ProviderHealth {
-  const configured = isProviderConfigured('SUPABASE');
-  const checks: HealthCheck[] = [
-    simpleCheck(
-      'supabase.project',
-      'Projekt erreichbar',
-      configured ? 'PASS' : 'AWAITING_EXTERNAL_INPUT',
-      configured
-        ? 'Supabase-Projekt konfiguriert.'
-        : 'Es ist kein Supabase-Projekt hinterlegt. Die Konsole läuft mit einer Demo-Sitzung gegen Fixtures.',
-      configured ? null : 'NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY und DATABASE_URL hinterlegen.',
-      true,
-    ),
-    simpleCheck(
-      'supabase.rls',
-      'Row Level Security',
-      configured ? 'PASS' : 'AWAITING_EXTERNAL_INPUT',
-      configured
-        ? 'RLS ist für alle Tabellen aktiv.'
-        : 'Ohne Projekt kann RLS nicht geprüft werden.',
-      null,
-      true,
-    ),
-    simpleCheck(
-      'supabase.storage',
-      'Storage-Buckets',
-      configured ? 'PASS' : 'AWAITING_EXTERNAL_INPUT',
-      configured ? 'Creative-Bucket vorhanden.' : 'Ohne Projekt existiert kein Bucket.',
-      null,
-      true,
-    ),
-  ];
-  return {
-    provider: 'SUPABASE',
-    state: configured ? 'CONNECTED' : 'FIXTURE',
-    overall: rollUpHealth(checks),
-    checks,
-    checkedAt: iso(0),
-  };
+async function supabaseHealth(): Promise<ProviderHealth> {
+  return checkSupabaseHealth({ now: iso(0) });
 }
 
 async function metaHealth(flags: FeatureFlags): Promise<ProviderHealth> {
@@ -1475,23 +1400,36 @@ function connectionFor(
     accountLabel,
     externalAccountId: null,
     grantedScopes: [],
-    connectedAt: health.state === 'CONNECTED' ? iso(-4320) : null,
+    // A probe establishes that a connection exists right now, not when it was
+    // first established — so the moment stays unknown rather than invented.
+    connectedAt: null,
     expiresAt: null,
     lastCheckedAt: health.checkedAt,
   };
 }
 
 async function buildIntegrations(flags: FeatureFlags): Promise<IntegrationsSnapshot> {
-  const [meta, hubspot] = await Promise.all([metaHealth(flags), hubspotHealth(flags)]);
-  const openai = openAiHealth();
-  const supabase = supabaseHealth();
+  // All four probes talk to something, so they run concurrently rather than
+  // adding up their latencies on the render path.
+  const [meta, hubspot, openai, supabase] = await Promise.all([
+    metaHealth(flags),
+    hubspotHealth(flags),
+    openAiHealth(),
+    supabaseHealth(),
+  ]);
 
+  // The headline sentence follows the probe result. A provider that did not
+  // answer is never introduced as a live connection.
   const modeDe = (health: ProviderHealth, live: string): string =>
     health.state === 'FIXTURE'
       ? 'Fixture-Modus: keine Verbindung zum Anbieter, alle Daten stammen aus dem Testdatensatz.'
       : health.state === 'NOT_CONFIGURED'
         ? 'Nicht konfiguriert: es sind keine Zugangsdaten hinterlegt.'
-        : live;
+        : health.state === 'ERROR'
+          ? 'Keine bestätigte Verbindung: Die letzte Prüfung ist fehlgeschlagen. Die Einzelheiten stehen in den Prüfungen unten.'
+          : health.state === 'DEGRADED'
+            ? `${live} Einzelne Prüfungen sind noch offen — siehe unten.`
+            : live;
 
   return {
     generatedAt: iso(0),
